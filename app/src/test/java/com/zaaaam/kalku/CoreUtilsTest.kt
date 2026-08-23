@@ -16,7 +16,7 @@ class CategoryDetectorTest {
         assertEquals(Category.IMAGE, CategoryDetector.detect("photo.dat", header(0xFF, 0xD8, 0xFF, 0xE0, 0, 0, 0, 0, 0, 0, 0, 0)))
         assertEquals(Category.DOCUMENT, CategoryDetector.detect("doc.dat", "%PDF-1.7".toByteArray() + ByteArray(6)))
         assertEquals(Category.ARCHIVE, CategoryDetector.detect("pack.dat", header(0x50, 0x4B, 0x03, 0x04, 0, 0, 0, 0, 0, 0, 0, 0)))
-        assertEquals(Category.AUDIO, CategoryDetector.detect("song.dat", "ID3\x04".toByteArray() + ByteArray(8)))
+        assertEquals(Category.AUDIO, CategoryDetector.detect("song.dat", "ID3\u0004".toByteArray() + ByteArray(8)))
         assertEquals(Category.VIDEO, CategoryDetector.detect("movie.dat", header(0x1A, 0x45, 0xDF, 0xA3, 0, 0, 0, 0, 0, 0, 0, 0))) // mkv/webm
     }
 
