@@ -7,7 +7,6 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.StaticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -75,39 +74,39 @@ fun categoryColor(category: String): Color = when (category) {
 // --------------------------------------------------------------- typography
 
 private fun precisionTypography() = Typography(
-    displayLarge = TextStyle(fontSize = 44.sp, fontFamily = InstrumentSerif, fontWeight = Normal),
-    displayMedium = TextStyle(fontSize = 36.sp, fontFamily = InstrumentSerif, fontWeight = Normal),
-    displaySmall = TextStyle(fontSize = 30.sp, fontFamily = InstrumentSerif, fontWeight = Normal),
-    headlineLarge = TextStyle(fontSize = 32.sp, fontFamily = InstrumentSerif, fontWeight = Normal),
-    headlineMedium = TextStyle(fontSize = 27.sp, fontFamily = InstrumentSerif, fontWeight = Normal),
-    headlineSmall = TextStyle(fontSize = 23.sp, fontFamily = InstrumentSerif, fontWeight = Normal),
-    titleLarge = TextStyle(fontSize = 19.sp, fontFamily = DMSans, fontWeight = Bold),
-    titleMedium = TextStyle(fontSize = 16.sp, fontFamily = DMSans, fontWeight = Medium),
-    titleSmall = TextStyle(fontSize = 14.sp, fontFamily = DMSans, fontWeight = Medium),
-    bodyLarge = TextStyle(fontSize = 15.sp, fontFamily = DMSans, fontWeight = Normal),
-    bodyMedium = TextStyle(fontSize = 13.sp, fontFamily = DMSans, fontWeight = Normal),
-    bodySmall = TextStyle(fontSize = 11.5.sp, fontFamily = DMSans, fontWeight = Normal),
-    labelLarge = TextStyle(fontSize = 13.sp, fontFamily = DMSans, fontWeight = Bold),
-    labelMedium = TextStyle(fontSize = 11.sp, fontFamily = DMSans, fontWeight = Medium),
-    labelSmall = TextStyle(fontSize = 10.sp, fontFamily = DMSans, fontWeight = Medium),
+    displayLarge = TextStyle(fontSize = 44.sp, fontFamily = InstrumentSerif, fontWeight = FontWeight.Normal),
+    displayMedium = TextStyle(fontSize = 36.sp, fontFamily = InstrumentSerif, fontWeight = FontWeight.Normal),
+    displaySmall = TextStyle(fontSize = 30.sp, fontFamily = InstrumentSerif, fontWeight = FontWeight.Normal),
+    headlineLarge = TextStyle(fontSize = 32.sp, fontFamily = InstrumentSerif, fontWeight = FontWeight.Normal),
+    headlineMedium = TextStyle(fontSize = 27.sp, fontFamily = InstrumentSerif, fontWeight = FontWeight.Normal),
+    headlineSmall = TextStyle(fontSize = 23.sp, fontFamily = InstrumentSerif, fontWeight = FontWeight.Normal),
+    titleLarge = TextStyle(fontSize = 19.sp, fontFamily = DMSans, fontWeight = FontWeight.Bold),
+    titleMedium = TextStyle(fontSize = 16.sp, fontFamily = DMSans, fontWeight = FontWeight.Medium),
+    titleSmall = TextStyle(fontSize = 14.sp, fontFamily = DMSans, fontWeight = FontWeight.Medium),
+    bodyLarge = TextStyle(fontSize = 15.sp, fontFamily = DMSans, fontWeight = FontWeight.Normal),
+    bodyMedium = TextStyle(fontSize = 13.sp, fontFamily = DMSans, fontWeight = FontWeight.Normal),
+    bodySmall = TextStyle(fontSize = 11.5.sp, fontFamily = DMSans, fontWeight = FontWeight.Normal),
+    labelLarge = TextStyle(fontSize = 13.sp, fontFamily = DMSans, fontWeight = FontWeight.Bold),
+    labelMedium = TextStyle(fontSize = 11.sp, fontFamily = DMSans, fontWeight = FontWeight.Medium),
+    labelSmall = TextStyle(fontSize = 10.sp, fontFamily = DMSans, fontWeight = FontWeight.Medium),
 )
 
 private fun terraTypography() = Typography(
-    displayLarge = TextStyle(fontSize = 42.sp, fontFamily = SoraFont, fontWeight = Bold),
-    displayMedium = TextStyle(fontSize = 34.sp, fontFamily = SoraFont, fontWeight = Bold),
-    displaySmall = TextStyle(fontSize = 28.sp, fontFamily = SoraFont, fontWeight = SemiBold),
-    headlineLarge = TextStyle(fontSize = 30.sp, fontFamily = SoraFont, fontWeight = Bold),
-    headlineMedium = TextStyle(fontSize = 25.sp, fontFamily = SoraFont, fontWeight = SemiBold),
-    headlineSmall = TextStyle(fontSize = 21.sp, fontFamily = SoraFont, fontWeight = SemiBold),
-    titleLarge = TextStyle(fontSize = 18.sp, fontFamily = InterFont, fontWeight = SemiBold),
-    titleMedium = TextStyle(fontSize = 15.5.sp, fontFamily = InterFont, fontWeight = Medium),
-    titleSmall = TextStyle(fontSize = 14.sp, fontFamily = InterFont, fontWeight = Medium),
-    bodyLarge = TextStyle(fontSize = 15.sp, fontFamily = InterFont, fontWeight = Normal),
-    bodyMedium = TextStyle(fontSize = 13.sp, fontFamily = InterFont, fontWeight = Normal),
-    bodySmall = TextStyle(fontSize = 11.5.sp, fontFamily = InterFont, fontWeight = Normal),
-    labelLarge = TextStyle(fontSize = 13.sp, fontFamily = InterFont, fontWeight = SemiBold),
-    labelMedium = TextStyle(fontSize = 11.sp, fontFamily = InterFont, fontWeight = Medium),
-    labelSmall = TextStyle(fontSize = 10.sp, fontFamily = InterFont, fontWeight = Medium),
+    displayLarge = TextStyle(fontSize = 42.sp, fontFamily = SoraFont, fontWeight = FontWeight.Bold),
+    displayMedium = TextStyle(fontSize = 34.sp, fontFamily = SoraFont, fontWeight = FontWeight.Bold),
+    displaySmall = TextStyle(fontSize = 28.sp, fontFamily = SoraFont, fontWeight = FontWeight.SemiBold),
+    headlineLarge = TextStyle(fontSize = 30.sp, fontFamily = SoraFont, fontWeight = FontWeight.Bold),
+    headlineMedium = TextStyle(fontSize = 25.sp, fontFamily = SoraFont, fontWeight = FontWeight.SemiBold),
+    headlineSmall = TextStyle(fontSize = 21.sp, fontFamily = SoraFont, fontWeight = FontWeight.SemiBold),
+    titleLarge = TextStyle(fontSize = 18.sp, fontFamily = InterFont, fontWeight = FontWeight.SemiBold),
+    titleMedium = TextStyle(fontSize = 15.5.sp, fontFamily = InterFont, fontWeight = FontWeight.Medium),
+    titleSmall = TextStyle(fontSize = 14.sp, fontFamily = InterFont, fontWeight = FontWeight.Medium),
+    bodyLarge = TextStyle(fontSize = 15.sp, fontFamily = InterFont, fontWeight = FontWeight.Normal),
+    bodyMedium = TextStyle(fontSize = 13.sp, fontFamily = InterFont, fontWeight = FontWeight.Normal),
+    bodySmall = TextStyle(fontSize = 11.5.sp, fontFamily = InterFont, fontWeight = FontWeight.Normal),
+    labelLarge = TextStyle(fontSize = 13.sp, fontFamily = InterFont, fontWeight = FontWeight.SemiBold),
+    labelMedium = TextStyle(fontSize = 11.sp, fontFamily = InterFont, fontWeight = FontWeight.Medium),
+    labelSmall = TextStyle(fontSize = 10.sp, fontFamily = InterFont, fontWeight = FontWeight.Medium),
 )
 
 // ------------------------------------------------------------------ schemes
