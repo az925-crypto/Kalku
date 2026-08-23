@@ -32,6 +32,7 @@ class SettingsRepo(private val context: Context) {
         val editorLineNumbers = booleanPreferencesKey("editor_line_numbers")
         val editorTabSize = intPreferencesKey("editor_tab_size")
         val trashRetentionDays = intPreferencesKey("trash_retention_days")
+        val themePack = stringPreferencesKey("theme_pack")
         val vaultIntroShown = booleanPreferencesKey("vault_intro_shown")
     }
 
@@ -51,6 +52,7 @@ class SettingsRepo(private val context: Context) {
     val editorLineNumbers: Flow<Boolean> = context.dataStore.data.map { it[K.editorLineNumbers] ?: true }
     val editorTabSize: Flow<Int> = context.dataStore.data.map { it[K.editorTabSize] ?: 4 }
     val trashRetentionDays: Flow<Int> = context.dataStore.data.map { it[K.trashRetentionDays] ?: 30 }
+    val themePack: Flow<String> = context.dataStore.data.map { it[K.themePack] ?: "PRECISION" }
     val vaultIntroShown: Flow<Boolean> = context.dataStore.data.map { it[K.vaultIntroShown] ?: false }
 
     suspend fun currentPinHash(): String? = pinHash.first()
@@ -71,5 +73,6 @@ class SettingsRepo(private val context: Context) {
     suspend fun setEditorLineNumbers(v: Boolean) = context.dataStore.edit { it[K.editorLineNumbers] = v }
     suspend fun setEditorTabSize(v: Int) = context.dataStore.edit { it[K.editorTabSize] = v.coerceIn(2, 8) }
     suspend fun setTrashRetentionDays(v: Int) = context.dataStore.edit { it[K.trashRetentionDays] = v.coerceIn(0, 365) }
+    suspend fun setThemePack(v: String) = context.dataStore.edit { it[K.themePack] = v }
     suspend fun setVaultIntroShown() = context.dataStore.edit { it[K.vaultIntroShown] = true }
 }

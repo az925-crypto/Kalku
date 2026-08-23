@@ -10,6 +10,7 @@ import com.zaaaam.kalku.fs.VaultPaths
 import com.zaaaam.kalku.security.LockController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -30,8 +31,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val themeMode: StateFlow<ThemeMode> = settings.themeMode
         .stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.SYSTEM)
 
+    @Suppress("unused")
     val accent: StateFlow<String> = settings.accent
         .stateIn(viewModelScope, SharingStarted.Eagerly, "teal")
+
+    val themePack: StateFlow<com.zaaaam.kalku.ui.theme.ThemePack> = settings.themePack
+        .map { raw ->
+            runCatching { com.zaaaam.kalku.ui.theme.ThemePack.valueOf(raw) }
+                .getOrDefault(com.zaaaam.kalku.ui.theme.ThemePack.PRECISION)
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, com.zaaaam.kalku.ui.theme.ThemePack.PRECISION)
 
     init {
         viewModelScope.launch {

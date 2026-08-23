@@ -19,6 +19,9 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreHoriz
@@ -43,6 +46,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.zaaaam.kalku.core.Category
@@ -54,6 +61,7 @@ import com.zaaaam.kalku.ui.iconFor
 @Composable
 fun DashboardScreen(
     vm: VaultViewModel,
+    onBrowseRoot: () -> Unit,
     onOpenFolder: (String) -> Unit,
     onSearch: () -> Unit,
     onFavorites: () -> Unit,
@@ -69,22 +77,25 @@ fun DashboardScreen(
     val favorites by vm.favorites.collectAsState()
     var query by remember { mutableStateOf("") }
 
+    Column(Modifier.fillMaxSize()) {
     LazyColumn(
-        Modifier.fillMaxSize(),
+        Modifier.fillMaxSize().weight(1f),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Surface(
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Column(Modifier.padding(16.dp)) {
+            Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(start = 20.dp, end = 14.dp, top = 14.dp, bottom = 4.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Vault", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onPrimary)
+                        androidx.compose.foundation.text.BasicText(
+                            buildAnnotatedString {
+                                withStyle(SpanStyle(fontStyle = androidx.compose.ui.text.font.FontStyle.Normal)) { append("Vault ") }
+                                withStyle(SpanStyle(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, color = MaterialTheme.colorScheme.secondary)) { append("privat") }
+                            },
+                            style = MaterialTheme.typography.headlineLarge,
+                        )
                         Spacer(Modifier.weight(1f))
-                        IconButton(onClick = onGallery) { Icon(Icons.Default.MoreHoriz, "Gallery", tint = MaterialTheme.colorScheme.onPrimary) }
-                        IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, "Settings", tint = MaterialTheme.colorScheme.onPrimary) }
-                        IconButton(onClick = onLock) { Icon(Icons.Default.Lock, "Lock", tint = MaterialTheme.colorScheme.onPrimary) }
+                        IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, "Settings", tint = MaterialTheme.colorScheme.secondary) }
+                        IconButton(onClick = onLock) { Icon(Icons.Default.Lock, "Lock", tint = MaterialTheme.colorScheme.tertiary) }
                     }
                     OutlinedTextField(
                         value = query,
@@ -92,13 +103,19 @@ fun DashboardScreen(
                             query = it
                             if (it.length >= 2) onSearch()
                         },
-                        placeholder = { Text("Cari file…", color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)) },
-                        leadingIcon = { Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onPrimary) },
+                        placeholder = { Text("Cari file, folder, tag…", color = MaterialTheme.colorScheme.outline) },
+                        leadingIcon = { Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.secondary) },
                         readOnly = true,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                            focusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onSearch() }
-                            .background(androidx.compose.ui.graphics.Color.Transparent),
+                            .clickable { onSearch() },
                         enabled = false,
                     )
                 }
@@ -121,6 +138,8 @@ fun DashboardScreen(
                                 LinearProgressIndicator(
                                     progress = { (s.size.toFloat() / maxCat).coerceIn(0.02f, 1f) },
                                     modifier = Modifier.fillMaxWidth(),
+                                    color = com.zaaaam.kalku.ui.theme.categoryColor(s.category.name),
+                                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
                                 )
                             }
                             Text(Format.bytes(s.size), Modifier.padding(start = 8.dp), style = MaterialTheme.typography.bodySmall)
@@ -173,6 +192,33 @@ fun DashboardScreen(
             SectionRow(Icons.Default.DeleteOutline, "Recycle Bin", "${vm.trashItems.collectAsState().value.size} item", onTrash)
             Spacer(Modifier.size(24.dp))
         }
+    }
+    androidx.compose.material3.NavigationBar(
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        androidx.compose.material3.NavigationBarItem(
+            selected = true, onClick = {},
+            icon = { Icon(Icons.Filled.Home, null) },
+            label = { Text("Home") },
+        )
+        androidx.compose.material3.NavigationBarItem(
+            selected = false, onClick = onBrowseRoot,
+            icon = { Icon(Icons.AutoMirrored.Filled.List, null) },
+            label = { Text("Browse") },
+        )
+        androidx.compose.material3.NavigationBarItem(
+            selected = false, onClick = onGallery,
+            icon = { Icon(Icons.Default.Image, null) },
+            label = { Text("Galeri") },
+        )
+        androidx.compose.material3.NavigationBarItem(
+            selected = false, onClick = onTrash,
+            icon = { Icon(Icons.Default.DeleteOutline, null) },
+            label = { Text("Sampah") },
+        )
+    }
     }
 }
 

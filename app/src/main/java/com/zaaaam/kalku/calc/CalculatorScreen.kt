@@ -1,5 +1,6 @@
 package com.zaaaam.kalku.calc
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.ContentCopy
@@ -17,9 +19,7 @@ import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Functions
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +27,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,11 +44,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zaaaam.kalku.core.AngleMode
 import com.zaaaam.kalku.data.CalcHistoryEntity
+import com.zaaaam.kalku.ui.theme.MonoNumbers
 
-private fun displayLabel(key: String): String = when (key) {
-    "*" -> "×"; "/" -> "÷"; "-" -> "−"; "+" -> "+"
-    else -> key
-}
+private enum class KeyRole { DIGIT, OP, UTIL, CLEAR, EQUALS }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,7 +62,7 @@ fun CalculatorScreen(
     var showHistory by remember { mutableStateOf(false) }
     var sciMode by remember { mutableStateOf(false) }
 
-    androidx.compose.runtime.LaunchedEffect(unlock) {
+    LaunchedEffect(unlock) {
         when (val s = unlock) {
             is UnlockSignal.Enter -> { vm.consumeUnlock(); onUnlocked(false) }
             is UnlockSignal.Setup -> { vm.consumeUnlock(); onUnlocked(true) }
@@ -79,13 +78,20 @@ fun CalculatorScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(12.dp),
+            .padding(horizontal = 14.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            AssistChip(
-                onClick = { tap(); vm.toggleAngle() },
-                label = { Text(if (vm.angleMode == AngleMode.DEG) "DEG" else "RAD") },
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(top = 8.dp),
+        ) {
+            SegmentedPill(
+                options = listOf("DEG", "RAD"),
+                selectedIndex = if (vm.angleMode == AngleMode.DEG) 0 else 1,
+                onSelect = { idx ->
+                    val targetDeg = idx == 0
+                    if (targetDeg != (vm.angleMode == AngleMode.DEG)) vm.toggleAngle()
+                },
             )
             Spacer(Modifier.weight(1f))
             IconButton(onClick = {
@@ -98,7 +104,7 @@ fun CalculatorScreen(
                 Icon(
                     Icons.Default.Functions,
                     contentDescription = "Scientific",
-                    tint = if (sciMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = if (sciMode) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             IconButton(onClick = { showHistory = true }) {
@@ -106,93 +112,100 @@ fun CalculatorScreen(
             }
         }
 
-        Spacer(Modifier.height(12.dp))
-
+        // Display — recessed LCD feel via surface tone
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(0.9f),
+                .weight(0.88f)
+                .padding(top = 8.dp, bottom = 6.dp),
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
                 text = vm.expression.ifBlank { "0" },
-                fontSize = 38.sp,
-                lineHeight = 46.sp,
+                fontSize = 34.sp,
+                lineHeight = 42.sp,
                 textAlign = TextAlign.End,
                 maxLines = 4,
                 color = MaterialTheme.colorScheme.onBackground,
+                fontFamily = MonoNumbers,
             )
             val pv = vm.preview()
             if (pv.isNotEmpty() && pv != vm.expression) {
                 Text(
                     text = "= $pv",
-                    fontSize = 20.sp,
+                    fontSize = 18.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.End,
+                    fontFamily = MonoNumbers,
                 )
             }
         }
 
-        if (sciMode) {
-            val sciRows = listOf(
-                listOf("sin(", "cos(", "tan(", "ln(", "log(", "sqrt("),
-                listOf("π", "e", "(", ")", "^", "!"),
-                listOf("asin(", "acos(", "atan(", "exp(", "%", ","),
-            )
-            sciRows.forEach { row ->
+            if (sciMode) {
+            val sciKeys = listOf("sin(", "cos(", "tan(", "ln(", "log(", "sqrt(", "asin(", "acos(", "atan(", "exp(", "%", "!")
+            sciKeys.chunked(6).forEach { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     row.forEach { key ->
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(40.dp)
-                                .clickable {
-                                    vm.append(if (key == "π") "π" else if (key == "e") "e" else key)
-                                    tap()
-                                },
-                            shape = MaterialTheme.shapes.small,
+                                .height(36.dp)
+                                .clickable { vm.append(key); tap() },
+                            shape = RoundedCornerShape(10.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         ) {
                             Column(
                                 Modifier.fillMaxSize(),
                                 verticalArrangement = Arrangement.Center,
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
-                                Text(key.removeSuffix("("), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    key.removeSuffix("(").replace("sqrt", "√"),
+                                    fontSize = 11.5.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontFamily = MonoNumbers,
+                                )
                             }
                         }
                     }
+                    repeat(6 - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
             Spacer(Modifier.height(2.dp))
         }
 
-        val rows = listOf(
-            listOf("C", "(", ")", "/"),
-            listOf("7", "8", "9", "*"),
-            listOf("4", "5", "6", "-"),
-            listOf("1", "2", "3", "+"),
+        data class Pad(val label: String, val role: KeyRole, val token: String? = null)
+
+        val lastRow = listOf(
+            Pad("+/-", KeyRole.UTIL), Pad("0", KeyRole.DIGIT, "0"),
+            Pad(".", KeyRole.UTIL, "."), Pad("=", KeyRole.EQUALS),
         )
+        val rows = listOf(
+            listOf(Pad("C", KeyRole.CLEAR), Pad("(", KeyRole.UTIL, "("), Pad(")", KeyRole.UTIL, ")"), Pad("÷", KeyRole.OP, "/")),
+            listOf(Pad("7", KeyRole.DIGIT, "7"), Pad("8", KeyRole.DIGIT, "8"), Pad("9", KeyRole.DIGIT, "9"), Pad("×", KeyRole.OP, "*")),
+            listOf(Pad("4", KeyRole.DIGIT, "4"), Pad("5", KeyRole.DIGIT, "5"), Pad("6", KeyRole.DIGIT, "6"), Pad("−", KeyRole.OP, "-")),
+            listOf(Pad("1", KeyRole.DIGIT, "1"), Pad("2", KeyRole.DIGIT, "2"), Pad("3", KeyRole.DIGIT, "3"), Pad("+", KeyRole.OP, "+")),
+        )
+
         rows.forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                row.forEach { key -> CalcKey(label = displayLabel(key), modifier = Modifier.weight(1f).height(56.dp)) {
-                    when (key) {
-                        "C" -> vm.clearAll()
-                        else -> vm.append(key)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { pad ->
+                    CalcKey(role = pad.role, modifier = Modifier.weight(1f).height(58.dp), label = pad.label) {
+                        when (pad.label) {
+                            "C" -> vm.clearAll()
+                            "+/-" -> toggleSign(vm)
+                            "=" -> vm.onEquals()
+                            else -> vm.append(pad.token ?: pad.label)
+                        }
+                        if (pad.label != "=") tap()
                     }
-                    tap()
-                } }
+                }
             }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            CalcKey("+/-", Modifier.weight(1f).height(56.dp)) { toggleSign(vm); tap() }
-            CalcKey("0", Modifier.weight(1f).height(56.dp)) { vm.append("0"); tap() }
-            CalcKey(".", Modifier.weight(1f).height(56.dp)) { vm.append("."); tap() }
-            CalcKey("=", Modifier.weight(1f).height(56.dp), emphasized = true) { vm.onEquals(); tap() }
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            CalcKey("", Modifier.weight(1f).height(44.dp), icon = Icons.AutoMirrored.Filled.Backspace, iconDesc = "Backspace") {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            CalcKey("", KeyRole.UTIL, Modifier.weight(1f).height(46.dp), icon = Icons.AutoMirrored.Filled.Backspace, iconDesc = "Backspace") {
                 vm.backspace(); tap()
             }
         }
@@ -218,55 +231,16 @@ fun CalculatorScreen(
 private fun toggleSign(vm: CalcViewModel) {
     val expr = vm.expression
     if (expr.isEmpty()) return
-    // Wrap the last number in (-n) form: toggling flips the leading sign of that number.
     val m = Regex("(\\d+\\.?\\d*)$").find(expr) ?: return
     val num = m.groupValues[1]
     val start = m.range.first
     val hasMinus = start > 0 && expr[start - 1] == '-' && (start == 1 || expr[start - 2] in "+-*/(")
     val updated = if (hasMinus) {
         expr.removeRange(start - 1, start + num.length)
-    } else if (start > 0 && (expr[start - 1] == '(' )) {
-        expr.replaceRange(start, start + num.length, "-$num")
     } else {
         expr.replaceRange(start, start + num.length, "(-$num)")
     }
     vm.replaceExpression(updated)
-}
-
-@Composable
-private fun CalcKey(
-    label: String,
-    modifier: Modifier = Modifier,
-    emphasized: Boolean = false,
-    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
-    iconDesc: String? = null,
-    onClick: () -> Unit,
-) {
-    Surface(
-        modifier = modifier.clickable(onClick = onClick),
-        shape = MaterialTheme.shapes.medium,
-        color = when {
-            emphasized -> MaterialTheme.colorScheme.primary
-            label.isEmpty() && icon != null -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            else -> MaterialTheme.colorScheme.surfaceVariant
-        },
-    ) {
-        Column(
-            Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            if (icon != null) {
-                Icon(icon, contentDescription = iconDesc, tint = MaterialTheme.colorScheme.primary)
-            } else {
-                Text(
-                    text = label,
-                    fontSize = 22.sp,
-                    color = if (emphasized) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                )
-            }
-        }
-    }
 }
 
 @Composable
@@ -293,10 +267,95 @@ private fun HistorySheet(
                     .clickable { onPick(item) }
                     .padding(vertical = 8.dp),
             ) {
-                Text(item.expression, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("= ${item.result}", fontSize = 18.sp)
+                Text(
+                    item.expression,
+                    fontSize = 13.sp,
+                    fontFamily = MonoNumbers,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    "= ${item.result}",
+                    fontSize = 17.sp,
+                    fontFamily = MonoNumbers,
+                )
             }
         }
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun SegmentedPill(options: List<String>, selectedIndex: Int, onSelect: (Int) -> Unit) {
+    Row(
+        Modifier
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(999.dp))
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        options.forEachIndexed { idx, opt ->
+            val selected = idx == selectedIndex
+            Text(
+                opt,
+                fontSize = 11.sp,
+                fontFamily = MonoNumbers,
+                color = if (selected) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .clickable { onSelect(idx) }
+                    .background(
+                        if (selected) MaterialTheme.colorScheme.surface else androidx.compose.ui.graphics.Color.Transparent,
+                        RoundedCornerShape(999.dp),
+                    )
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun CalcKey(
+    label: String,
+    role: KeyRole,
+    modifier: Modifier = Modifier,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    iconDesc: String? = null,
+    onClick: () -> Unit,
+) {
+    val cs = MaterialTheme.colorScheme
+    data class Look(val container: androidx.compose.ui.graphics.Color, val content: androidx.compose.ui.graphics.Color)
+    val look = when (role) {
+        KeyRole.DIGIT -> Look(cs.surfaceVariant, cs.onSurface)
+        KeyRole.OP -> Look(cs.secondaryContainer, cs.onSecondaryContainer)
+        KeyRole.UTIL -> Look(cs.background, cs.onSurfaceVariant)
+        KeyRole.CLEAR -> Look(cs.errorContainer, cs.onErrorContainer)
+        KeyRole.EQUALS -> Look(cs.tertiary, cs.onTertiary)
+    }
+    Surface(
+        modifier = modifier.clickable(onClick = onClick),
+        shape = RoundedCornerShape(20.dp),
+        color = look.container,
+        border = BorderStroke(1.dp, cs.outlineVariant),
+    ) {
+        Column(
+            Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            if (icon != null) {
+                Icon(icon, contentDescription = iconDesc, tint = cs.onSurfaceVariant)
+            } else {
+                Text(
+                    label,
+                    fontSize = when (role) {
+                        KeyRole.OP -> 24.sp
+                        KeyRole.EQUALS -> 22.sp
+                        KeyRole.UTIL -> 17.sp
+                        else -> 21.sp
+                    },
+                    fontWeight = if (role == KeyRole.EQUALS) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal,
+                    fontFamily = MonoNumbers,
+                    color = look.content,
+                )
+            }
+        }
     }
 }

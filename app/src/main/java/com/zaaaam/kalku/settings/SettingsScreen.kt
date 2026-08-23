@@ -61,7 +61,7 @@ fun SettingsScreen(
     val context = LocalContext.current
 
     val themeMode by s.themeMode.collectAsState(initial = ThemeMode.SYSTEM)
-    val accent by s.accent.collectAsState(initial = "teal")
+    val packStr by s.themePack.collectAsState(initial = "PRECISION")
     val angleDefault by s.angleDefault.collectAsState(initial = "DEG")
     val haptics by s.haptics.collectAsState(initial = true)
     val precision by s.precision.collectAsState(initial = 10)
@@ -103,19 +103,22 @@ fun SettingsScreen(
                         FilterChip(selected = themeMode == ThemeMode.DARK, onClick = { scope.launch { s.setThemeMode(ThemeMode.DARK) } }, label = { Text("Dark") })
                     }
                     Spacer(Modifier.size(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        com.zaaaam.kalku.ui.theme.ACCENTS.forEach { a ->
-                            androidx.compose.material3.Surface(
-                                color = a.primary,
-                                shape = MaterialTheme.shapes.extraLarge,
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clickable { scope.launch { s.setAccent(a.key) } },
-                                border = if (accent == a.key) androidx.compose.foundation.BorderStroke(
-                                    2.dp,
-                                    MaterialTheme.colorScheme.onSurface,
-                                ) else null,
-                            ) {}
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        com.zaaaam.kalku.ui.theme.ThemePack.entries.forEach { pack ->
+                            val selectedNow = packStr == pack.name
+                            androidx.compose.material3.Card(
+                                onClick = { scope.launch { s.setThemePack(pack.name) } },
+                                colors = androidx.compose.material3.CardDefaults.cardColors(
+                                    containerColor = if (selectedNow) MaterialTheme.colorScheme.primaryContainer
+                                                     else MaterialTheme.colorScheme.surfaceVariant,
+                                ),
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Column(Modifier.padding(10.dp)) {
+                                    Text(pack.label, style = MaterialTheme.typography.titleSmall)
+                                    Text(pack.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                                }
+                            }
                         }
                     }
                 }

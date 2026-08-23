@@ -4,6 +4,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -125,25 +126,51 @@ internal fun GridEntry(
     onTap: () -> Unit,
     onLongPress: () -> Unit,
 ) {
+    val catColor = com.zaaaam.kalku.ui.theme.categoryColor(entry.category)
     Surface(
         shape = MaterialTheme.shapes.medium,
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            if (selected) 2.dp else 1.dp,
+            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+        ),
         modifier = Modifier.combinedClickable(onClick = onTap, onLongClick = onLongPress),
     ) {
-        Column(Modifier.padding(vertical = 12.dp, horizontal = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Box {
+        Column {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .background(catColor.copy(alpha = 0.14f))
+                    .padding(vertical = 18.dp),
+                contentAlignment = Alignment.Center,
+            ) {
                 Icon(
                     iconFor(entry.isFolder, entry.category),
                     contentDescription = entry.name,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(34.dp),
+                    tint = catColor,
+                    modifier = Modifier.size(30.dp),
                 )
                 if (selecting || selected) {
-                    Checkbox(checked = selected, onCheckedChange = { onTap() }, modifier = Modifier.align(Alignment.TopEnd))
+                    Checkbox(
+                        checked = selected,
+                        onCheckedChange = { onTap() },
+                        modifier = Modifier.align(Alignment.TopEnd).size(26.dp),
+                        colors = androidx.compose.material3.CheckboxDefaults.colors(
+                            checkedColor = MaterialTheme.colorScheme.primary,
+                        ),
+                    )
                 }
             }
-            Spacer(Modifier.size(6.dp))
-            Text(entry.name, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(
+                entry.name,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(horizontal = 8.dp, vertical = 7.dp),
+            )
         }
     }
 }
@@ -176,7 +203,7 @@ internal fun ListRow(
                 if (selecting || selected) {
                     Checkbox(checked = selected, onCheckedChange = { onTap() })
                 } else {
-                    Icon(iconFor(entry.isFolder, entry.category), null, tint = MaterialTheme.colorScheme.primary)
+                    Icon(iconFor(entry.isFolder, entry.category), null, tint = com.zaaaam.kalku.ui.theme.categoryColor(entry.category))
                 }
             }
         },

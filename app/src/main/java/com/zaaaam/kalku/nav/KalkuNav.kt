@@ -108,6 +108,7 @@ fun KalkuNav(mainVm: MainViewModel) {
                 var showPinSetup by remember { mutableStateOf(PinSetupPending.value) }
                 DashboardScreen(
                     vm = vaultVm,
+                    onBrowseRoot = { nav.navigate(Routes.browser("")) },
                     onOpenFolder = { folder -> nav.navigate(Routes.browser(folder)) },
                     onSearch = { nav.navigate(Routes.SEARCH) },
                     onFavorites = { nav.navigate(Routes.FAVORITES) },

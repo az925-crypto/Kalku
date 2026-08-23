@@ -37,7 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.foundation.background
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zaaaam.kalku.vault.VaultViewModel
@@ -154,6 +154,8 @@ fun TextEditorScreen(
                 Column(
                     Modifier
                         .width(44.dp)
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .padding(vertical = 8.dp),
                     horizontalAlignment = Alignment.End,
                 ) {
@@ -161,8 +163,9 @@ fun TextEditorScreen(
                         Text(
                             "${i + 1}",
                             fontSize = settings.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
+                            lineHeight = (settings * 1.4f).sp,
+                            fontFamily = com.zaaaam.kalku.ui.theme.MonoNumbers,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             modifier = Modifier.padding(end = 6.dp),
                         )
                     }
@@ -175,8 +178,9 @@ fun TextEditorScreen(
                     onValueChange = ::onChange,
                     textStyle = TextStyle(
                         fontSize = settings.sp,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = com.zaaaam.kalku.ui.theme.MonoNumbers,
                         lineHeight = (settings * 1.4f).sp,
+                        color = MaterialTheme.colorScheme.onBackground,
                     ),
                     modifier = Modifier
                         .fillMaxWidth()

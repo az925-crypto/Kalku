@@ -21,8 +21,8 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
         setContent {
             val theme by vm.themeMode.collectAsStateWithLifecycle()
-            val accent by vm.accent.collectAsStateWithLifecycle()
-            KalkuTheme(theme, accent) {
+            val pack by vm.themePack.collectAsStateWithLifecycle()
+            KalkuTheme(theme, pack) {
                 KalkuNav(vm)
             }
         }
