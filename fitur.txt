@@ -1,0 +1,799 @@
+FITUR.TXT
+=========
+
+NAMA KONSEP
+-----------
+Aplikasi penyimpanan file universal dengan tampilan depan berupa kalkulator.
+Aplikasi berfungsi sebagai kalkulator normal, tetapi memiliki akses tersembunyi
+menuju Vault untuk menyimpan, mengelola, melihat, dan mengedit berbagai jenis
+file secara lokal.
+
+PRINSIP UTAMA
+-------------
+1. Gratis
+2. Offline-first
+3. Tidak membutuhkan akun
+4. Tidak membutuhkan server/cloud
+5. File disimpan secara lokal
+6. Data Vault diusahakan tetap tersedia setelah aplikasi di-uninstall lalu
+   di-install kembali
+7. Mendukung berbagai jenis file tanpa membatasi extension tertentu
+8. Kalkulator tetap berfungsi normal sebagai kamuflase
+9. Vault memiliki sistem keamanan tersendiri
+10. Database hanya digunakan untuk metadata/index, bukan sebagai tempat utama
+    penyimpanan file
+
+
+==================================================
+1. KALKULATOR KAMUFLASE
+==================================================
+
+Aplikasi pertama kali dibuka akan menampilkan kalkulator normal.
+
+Kalkulator harus terlihat dan terasa seperti aplikasi kalkulator sungguhan,
+sehingga pengguna lain tidak langsung mengetahui adanya Vault.
+
+FITUR BASIC:
+- Penjumlahan
+- Pengurangan
+- Perkalian
+- Pembagian
+- Persentase
+- Desimal
+- Kurung
+- Negatif/positif
+- Clear
+- Backspace
+- Riwayat perhitungan
+- Copy hasil
+- Paste expression
+
+FITUR SCIENTIFIC:
+- Pangkat
+- Akar
+- Sin
+- Cos
+- Tan
+- Inverse trigonometry
+- Log
+- Ln
+- Eksponensial
+- Faktorial
+- Modulo
+- Konstanta PI
+- Konstanta e
+- Scientific notation
+- DEG/RAD
+
+Kalkulator tidak boleh terlihat terlalu kompleks.
+Tujuannya tetap menjadi kalkulator yang nyaman digunakan, bukan sekadar
+tampilan palsu.
+
+
+==================================================
+2. HIDDEN VAULT UNLOCK
+==================================================
+
+Vault tidak ditampilkan secara langsung pada halaman utama.
+
+Pengguna dapat memasukkan secret tertentu melalui kalkulator.
+
+Contoh:
+
+1234 =
+    ↓
+Vault terbuka
+
+Jika input bukan secret:
+
+123 + 456 =
+    ↓
+579
+
+Input biasa tetap diproses sebagai kalkulasi normal.
+
+Sistem unlock dapat mendukung:
+- PIN
+- Secret expression
+- Pattern/sequence
+- Gesture
+- Biometric sebagai metode tambahan
+
+Secret tidak ditampilkan secara jelas pada UI.
+
+Jika memungkinkan, sistem keamanan tidak menyimpan secret dalam bentuk
+plain text.
+
+
+==================================================
+3. VAULT
+==================================================
+
+Vault merupakan tempat utama untuk mengelola seluruh file.
+
+Vault tidak membatasi jenis file berdasarkan extension.
+
+Contoh file yang dapat disimpan:
+
+IMAGE:
+- JPG
+- JPEG
+- PNG
+- WEBP
+- GIF
+- SVG
+- HEIC/HEIF jika didukung perangkat
+
+VIDEO:
+- MP4
+- MKV
+- AVI
+- MOV
+- dan format lain yang didukung perangkat
+
+AUDIO:
+- MP3
+- WAV
+- FLAC
+- M4A
+- dan format lainnya
+
+DOCUMENT:
+- PDF
+- DOCX
+- XLSX
+- PPTX
+- CSV
+- TXT
+- MD
+
+CODE:
+- JS
+- TS
+- PY
+- HTML
+- CSS
+- JSON
+- XML
+- JAVA
+- KOTLIN
+- C
+- C++
+- SQL
+- SH
+- dan lainnya
+
+ARCHIVE:
+- ZIP
+- 7Z
+- TAR
+- GZ
+- format lain jika library mendukung
+
+OTHER:
+- File yang tidak dikenal atau tidak memiliki extension yang dikenali.
+
+
+==================================================
+4. FILE MANAGER
+==================================================
+
+Vault memiliki file manager internal.
+
+Fitur:
+- Membuat folder
+- Membuka folder
+- Rename
+- Copy
+- Move
+- Delete
+- Multi-select
+- Sort
+- Filter
+- Search
+- Grid view
+- List view
+- File details
+- Share
+- Import
+- Export
+
+Struktur default:
+
+Vault/
+├── Photos/
+├── Videos/
+├── Audio/
+├── Documents/
+├── Code/
+├── Archives/
+└── Others/
+
+
+==================================================
+5. GALLERY
+==================================================
+
+File gambar dapat dibuka melalui gallery internal.
+
+Fitur:
+- Grid
+- List
+- Fullscreen
+- Zoom
+- Swipe
+- Favorite
+- Rename
+- Move
+- Copy
+- Delete
+- Share
+- Tag
+- Search
+- Sort
+- Informasi file
+
+Gallery dapat menampilkan thumbnail.
+
+
+==================================================
+6. VIDEO PLAYER
+==================================================
+
+File video dapat diputar langsung dari Vault.
+
+Fitur:
+- Play
+- Pause
+- Seek
+- Volume
+- Fullscreen
+- Playback speed
+- Picture-in-picture jika didukung
+- Subtitle jika tersedia
+- Informasi file
+- Share
+
+
+==================================================
+7. AUDIO PLAYER
+==================================================
+
+File audio dapat diputar langsung dari Vault.
+
+Fitur:
+- Play
+- Pause
+- Seek
+- Volume
+- Playback speed
+- Loop
+- Shuffle
+- Playlist
+- Background playback
+- Metadata
+- Cover art jika tersedia
+
+
+==================================================
+8. PDF VIEWER
+==================================================
+
+PDF dapat dibuka tanpa harus keluar dari aplikasi.
+
+Fitur:
+- Membuka PDF
+- Page navigation
+- Zoom
+- Search text
+- Bookmark
+- Informasi file
+- Share
+
+Pengembangan lanjutan dapat menambahkan:
+- Highlight
+- Annotation
+- Drawing
+
+
+==================================================
+9. TEXT EDITOR
+==================================================
+
+File teks dapat dibuat dan diedit langsung di dalam aplikasi.
+
+Format utama:
+- TXT
+- MD
+- JSON
+- XML
+- CSV
+- konfigurasi teks lainnya
+
+Fitur:
+- Create file
+- Edit
+- Save
+- Save As
+- Rename
+- Search
+- Find and Replace
+- Undo
+- Redo
+- Auto-save
+- Word count
+- Line count
+- Encoding selection
+
+
+==================================================
+10. CODE EDITOR
+==================================================
+
+Aplikasi menyediakan editor kode ringan.
+
+Bahasa yang didukung:
+- JavaScript
+- TypeScript
+- Python
+- HTML
+- CSS
+- JSON
+- XML
+- Java
+- Kotlin
+- C
+- C++
+- SQL
+- Shell
+- Markdown
+
+Fitur:
+- Syntax highlighting
+- Line numbers
+- Find
+- Replace
+- Auto indentation
+- Bracket matching
+- Word wrap
+- Go to line
+- Font size
+- Tab/space configuration
+- Undo/Redo
+
+Editor berfungsi sebagai editor kode, bukan compiler.
+
+
+==================================================
+11. ARCHIVE MANAGER
+==================================================
+
+Aplikasi dapat mengelola file archive jika format tersebut didukung.
+
+Fitur:
+- Membuka archive
+- Melihat isi archive
+- Extract
+- Membuat ZIP
+- Menambahkan file
+- Menghapus file dari archive
+- Rename
+- Share
+
+
+==================================================
+12. UNIVERSAL SEARCH
+==================================================
+
+Pengguna dapat mencari file dari seluruh Vault.
+
+Search berdasarkan:
+- Nama file
+- Extension
+- Folder
+- Tag
+- Tanggal
+- Ukuran
+- Favorite
+
+Contoh:
+
+Search:
+photo
+
+Hasil:
+- photo.jpg
+- holiday_photo.png
+- photo_backup.zip
+
+
+==================================================
+13. FAVORITE
+==================================================
+
+File dapat ditandai sebagai Favorite.
+
+Pengguna dapat membuka halaman khusus:
+
+Favorites
+
+yang berisi semua file penting.
+
+
+==================================================
+14. TAG SYSTEM
+==================================================
+
+File dapat diberikan tag.
+
+Contoh:
+
+- School
+- Project
+- Important
+- Personal
+- Code
+- Archive
+
+Satu file dapat memiliki lebih dari satu tag.
+
+
+==================================================
+15. RECENT FILES
+==================================================
+
+Aplikasi menyimpan daftar file yang terakhir dibuka.
+
+Contoh:
+
+Recently Opened:
+
+- tugas.pdf
+- script.js
+- foto.jpg
+- notes.txt
+
+Tujuannya agar file yang sering digunakan mudah diakses kembali.
+
+
+==================================================
+16. RECYCLE BIN
+==================================================
+
+File yang dihapus tidak langsung dihancurkan.
+
+Alur:
+
+Delete
+  ↓
+Recycle Bin
+  ↓
+Restore
+atau
+Permanent Delete
+
+Recycle Bin dapat memiliki masa penyimpanan otomatis.
+
+
+==================================================
+17. FILE SECURITY
+==================================================
+
+Vault memiliki sistem keamanan.
+
+Fitur:
+- PIN
+- Pattern
+- Biometric
+- Auto-lock
+- Manual lock
+- Secure Vault
+
+Untuk Secure Vault, file dapat disimpan dalam bentuk terenkripsi.
+
+Tujuannya agar file tidak dapat langsung dibaca apabila seseorang mengakses
+storage perangkat secara langsung.
+
+
+==================================================
+18. PERSISTENT STORAGE
+==================================================
+
+File Vault harus dirancang agar tidak bergantung pada private app storage
+sebagai satu-satunya tempat penyimpanan.
+
+Tujuan:
+
+Install aplikasi
+    ↓
+Import file
+    ↓
+Uninstall aplikasi
+    ↓
+Install kembali
+    ↓
+Aplikasi mendeteksi Vault yang sudah ada
+    ↓
+File kembali ditampilkan
+
+Aplikasi memiliki fitur untuk melakukan scan dan membangun ulang index
+apabila database metadata hilang atau rusak.
+
+CATATAN:
+Kemampuan mempertahankan file setelah uninstall bergantung pada lokasi
+penyimpanan dan perilaku Android. Aplikasi harus menggunakan storage yang
+sesuai untuk data yang memang ingin dipertahankan.
+
+
+==================================================
+19. DATABASE / METADATA
+==================================================
+
+Database tidak digunakan untuk menyimpan isi file.
+
+Database hanya menyimpan informasi seperti:
+
+- ID
+- Nama file
+- Lokasi/URI
+- MIME type
+- Extension
+- Ukuran
+- Tanggal dibuat
+- Tanggal dimodifikasi
+- Folder
+- Favorite
+- Tag
+- Informasi tambahan
+
+Jika database hilang, aplikasi harus dapat melakukan:
+
+SCAN VAULT
+    ↓
+Mendeteksi file
+    ↓
+Membaca metadata
+    ↓
+Membangun kembali index
+
+
+==================================================
+20. SMART FILE DETECTION
+==================================================
+
+Aplikasi tidak hanya bergantung pada extension.
+
+Jika memungkinkan, aplikasi dapat mengenali tipe file berdasarkan MIME type
+dan file signature.
+
+Tujuannya agar file tetap dapat dikategorikan meskipun:
+- Extension salah
+- Extension tidak dikenal
+- File tidak memiliki extension
+
+
+==================================================
+21. IMPORT
+==================================================
+
+Pengguna dapat memasukkan file ke Vault melalui:
+
+- Android File Picker
+- Media Picker
+- Share Sheet
+- Import dari folder
+- Multi-file selection
+
+Contoh:
+
+Share → MyVault
+
+File langsung masuk ke Vault.
+
+
+==================================================
+22. EXPORT
+==================================================
+
+Pengguna dapat mengeluarkan file dari Vault.
+
+Fitur:
+- Export satu file
+- Export banyak file
+- Export folder
+- Share file
+- Save copy
+
+
+==================================================
+23. STORAGE ANALYZER
+==================================================
+
+Aplikasi menampilkan penggunaan storage.
+
+Contoh:
+
+Images       2.4 GB
+Videos       8.1 GB
+Audio        1.2 GB
+Documents    420 MB
+Code         80 MB
+Others       300 MB
+
+Total        12.5 GB
+
+Tujuannya agar pengguna mengetahui file apa yang paling banyak memakan
+storage.
+
+
+==================================================
+24. DASHBOARD VAULT
+==================================================
+
+Halaman utama Vault menampilkan:
+
+- Storage usage
+- Recent files
+- Favorites
+- Categories
+- Search
+- Quick actions
+
+Contoh:
+
+VAULT
+
+[ Search ]
+
+Recent
+- tugas.pdf
+- main.js
+- photo.jpg
+
+Categories
+[ Photos ] [ Videos ]
+[ Audio ]  [ Documents ]
+[ Code ]   [ Archives ]
+
+Favorites
+...
+
+
+==================================================
+25. SETTINGS
+==================================================
+
+CALCULATOR:
+- Mode
+- DEG/RAD
+- Precision
+- Haptic feedback
+- History
+
+SECURITY:
+- Change PIN
+- Change unlock method
+- Biometric
+- Auto-lock
+- Secure Vault
+
+VAULT:
+- Default folder
+- Sorting
+- Thumbnail settings
+- Recycle Bin settings
+- Rebuild index
+- Import
+- Export
+
+EDITOR:
+- Font size
+- Line numbers
+- Word wrap
+- Tab size
+- Syntax theme
+
+APPEARANCE:
+- Light
+- Dark
+- System
+- Accent color
+
+
+==================================================
+26. BACKUP / RECOVERY
+==================================================
+
+Aplikasi menyediakan opsi backup metadata dan konfigurasi.
+
+File tetap menjadi sumber data utama.
+
+Jika index/database rusak:
+
+Settings
+    ↓
+Rebuild Vault Index
+    ↓
+Scan storage
+    ↓
+Recreate metadata
+    ↓
+Vault kembali normal
+
+
+==================================================
+27. PRIVACY
+==================================================
+
+Aplikasi dirancang dengan prinsip:
+
+- Tidak membutuhkan akun
+- Tidak membutuhkan server
+- Tidak mengupload file secara otomatis
+- Tidak membutuhkan internet untuk fungsi utama
+- File tetap berada di perangkat
+- Pengguna memiliki kontrol terhadap file
+- Cloud sync tidak menjadi requirement
+
+
+==================================================
+28. FITUR MASA DEPAN
+==================================================
+
+Fitur tambahan yang dapat dikembangkan kemudian:
+
+- Cloud backup opsional
+- Sync antar-device
+- QR transfer
+- Wi-Fi transfer
+- Local network sharing
+- Folder encryption
+- File versioning
+- Image editor
+- PDF annotation
+- Advanced code editor
+- Markdown preview
+- Archive encryption
+- Duplicate file detector
+- Storage cleaner
+- Custom file categories
+- Custom themes
+
+
+==================================================
+TUJUAN AKHIR
+==================================================
+
+Aplikasi harus terasa seperti kalkulator dari luar, tetapi sebenarnya merupakan
+universal personal file vault.
+
+Dari satu aplikasi pengguna dapat:
+
+1. Menghitung matematika
+2. Membuka Vault secara tersembunyi
+3. Menyimpan berbagai jenis file
+4. Mengelola file
+5. Membuka foto
+6. Memutar video
+7. Memutar audio
+8. Membaca PDF
+9. Mengedit TXT
+10. Mengedit source code
+11. Mengelola archive
+12. Mencari file
+13. Memberikan tag dan favorite
+14. Menggunakan recycle bin
+15. Melindungi Vault
+16. Mengatur file secara offline
+17. Mempertahankan file di storage meskipun aplikasi dihapus dan dipasang
+    kembali, selama file berada pada storage yang memang dipertahankan Android
+
+PRINSIP DESAIN:
+
+"Calculator outside.
+Vault inside.
+Everything local.
+Everything under user's control."
+
+
+push ke github ini hasil projek nya https://github.com/az925-crypto/Kalku.git dan build release apk mya di situ juga

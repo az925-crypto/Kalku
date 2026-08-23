@@ -1,0 +1,80 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Restore signing keystore from secret
+        id: keystore
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP"
+          KS="$RUNNER_TEMP/kalku-upload.jks"
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            printf '%s' "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$KS"
+            echo "KEYSTORE_PATH=$KS" >> "$GITHUB_ENV"
+            echo "KEYSTORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> "$GITHUB_ENV"
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No keystore secret found — falling back to debug signing."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Unit tests
+        run: gradle --no-daemon testReleaseUnitTest --stacktrace
+
+      - name: Assemble release APK
+        run: gradle --no-daemon assembleRelease --stacktrace
+
+      - name: Rename APK
+        id: apk
+        run: |
+          VERSION=$(grep -o 'versionName = "[^"]*"' app/build.gradle.kts | head -1 | cut -d'"' -f2)
+          SRC=$(find app/build/outputs/apk/release -maxdepth 1 -name '*.apk' | head -1)
+          DEST="Kalku-v${VERSION}-release.apk"
+          cp "$SRC" "$DEST"
+          sha256sum "$DEST" > "$DEST.sha256"
+          echo "file=$DEST" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kalku-apk
+          path: |
+            ${{ steps.apk.outputs.file }}
+            ${{ steps.apk.outputs.file }}.sha256
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') && steps.keystore.outputs.signed == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ steps.apk.outputs.file }}
+            ${{ steps.apk.outputs.file }}.sha256
+          generate_release_notes: true
