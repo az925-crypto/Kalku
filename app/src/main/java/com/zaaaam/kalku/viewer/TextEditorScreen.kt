@@ -240,7 +240,7 @@ private fun FindReplaceDialog(
         onDismissRequest = onDismiss,
         title = { Text("Find & Replace") },
         text = {
-            Column(spacedBy8()) {
+            Column(verticalArrangement = spacedBy8()) {
                 OutlinedTextField(value = find, onValueChange = {
                     find = it
                     matchCount = if (find.isEmpty()) 0 else countOccurrences(initialText, find)

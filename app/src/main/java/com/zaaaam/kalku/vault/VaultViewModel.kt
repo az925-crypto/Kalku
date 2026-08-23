@@ -136,12 +136,14 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
 
     fun dismissToast() { toast.value = null }
 
-    fun launchIntent(intent: Intent) {
-        runCatching {
-            appContext.startActivity(
-                Intent(intent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-        }.onFailure { fail(Exception("Tidak ada aplikasi untuk aksi ini")) }
+    fun launchIntent(intent: Intent) = viewModelScope.launch {
+        withContext(Dispatchers.Main) {
+            runCatching {
+                getApplication<Application>().startActivity(
+                    Intent(intent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }.onFailure { fail(Exception("Tidak ada aplikasi untuk aksi ini")) }
+        }
     }
 
     fun runIo(block: suspend () -> Unit) = viewModelScope.launch(Dispatchers.IO) {
