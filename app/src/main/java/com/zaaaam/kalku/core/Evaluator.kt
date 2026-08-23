@@ -153,13 +153,14 @@ object Evaluator {
         private fun startsValue(tok: Tok?): Boolean = tok is Tok.Num || tok is Tok.Id ||
             (tok is Tok.Op && (tok.ch == '(' || tok.ch == '-' || tok.ch == '+'))
 
-        private fun unary(): Double = when (val cur = peek()) {
-            is Tok.Op && (cur.ch == '-' || cur.ch == '+') -> {
+        private fun unary(): Double {
+            val cur = peek()
+            if (cur is Tok.Op && (cur.ch == '-' || cur.ch == '+')) {
                 p++
                 val v = unary()
-                if (cur.ch == '-') -v else v
+                return if (cur.ch == '-') -v else v
             }
-            else -> pow()
+            return pow()
         }
 
         private fun pow(): Double {
