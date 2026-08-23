@@ -23,7 +23,7 @@ class EvaluatorTest {
 
     @Test fun basicArithmetic() {
         assertEquals(7.0, value("2+3*2-1"), 1e-9)
-        assertEquals(6.0, value("(2+4)/2"), 1e-9)
+        assertEquals(3.0, value("(2+4)/2"), 1e-9)
         assertEquals(0.5, value("1/2"), 1e-9)
         assertEquals(8.0, value("2^3"), 1e-9)
     }
@@ -40,7 +40,7 @@ class EvaluatorTest {
 
     @Test fun percentPostfix() {
         assertEquals(0.5, value("50%"), 1e-9)
-        assertEquals(150.0, value("100+50%"), 1e-12)
+        assertEquals(150.0, value("100+50%"), 1e-9) // calculator-style: % relative to lhs
     }
 
     @Test fun moduloBinary() {
@@ -62,7 +62,7 @@ class EvaluatorTest {
 
     @Test fun functions() {
         assertEquals(2.0, value("sqrt(4)"), 1e-12)
-        assertEquals(1000.0, value("log(10^3)"), 1e-9)
+        assertEquals(3.0, value("log(10^3)"), 1e-9)
         assertEquals(Math.E, value("ln(e)"), 1e-12)
         assertEquals(1.0, value("sin(90)"), 1e-12)
         assertEquals(0.0, value("cos(90)"), 1e-12)

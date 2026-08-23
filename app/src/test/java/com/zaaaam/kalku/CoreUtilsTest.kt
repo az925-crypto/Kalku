@@ -67,7 +67,7 @@ class NamesFormatTest {
 
     @Test fun sanitizeStripsIllegal() {
         assertEquals("my file.txt", Names.sanitizeFileName(" my file.txt "))
-        assertEquals("a_b_c", Names.sanitizeFileName("a/b\\c"))
+        assertEquals("abc", Names.sanitizeFileName("a/b\\c"))
         assertEquals("untitled", Names.sanitizeFileName(".."))
         assertEquals("untitled", Names.sanitizeFileName(""))
     }

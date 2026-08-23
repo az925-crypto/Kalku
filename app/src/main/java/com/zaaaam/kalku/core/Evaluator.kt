@@ -102,6 +102,9 @@ object Evaluator {
     private class Parser(private val t: List<Tok>, private val angle: AngleMode) {
         private var p = 0
 
+        /** Original value of the last postfix-percent operand (before /100). */
+        private var lastPercentOperand: Double? = null
+
         fun parseExpression(): Double = addSub()
 
         fun expectEnd() {
@@ -121,10 +124,19 @@ object Evaluator {
         private fun addSub(): Double {
             var acc = mulDiv()
             while (true) {
-                when {
-                    eatOp('+') -> acc += mulDiv()
-                    eatOp('-') -> acc -= mulDiv()
+                val op = when {
+                    eatOp('+') -> '+'
+                    eatOp('-') -> '-'
                     else -> return acc
+                }
+                val rhs = mulDiv()
+                // Calculator convention: a + b% == a + a*b/100 (percent relative to lhs)
+                val pct = lastPercentOperand.also { lastPercentOperand = null }
+                acc += when {
+                    pct != null && op == '+' -> acc * pct / 100.0
+                    pct != null && op == '-' -> -(acc * pct / 100.0)
+                    op == '+' -> rhs
+                    else -> -rhs
                 }
             }
         }
@@ -138,13 +150,6 @@ object Evaluator {
                         val d = unary()
                         acc = if (d == 0.0 && acc == 0.0) Double.NaN else acc / d
                     }
-                    // '%' acts as modulo when a value follows, otherwise as postfix percent
-                    peek() is Tok.Op && (peek() as Tok.Op).ch == '%' && startsValue(t.getOrNull(p + 1)) -> {
-                        p++
-                        val d = unary()
-                        if (d == 0.0) throw SyntaxException("Modulo by zero")
-                        acc %= d
-                    }
                     else -> return acc
                 }
             }
@@ -154,6 +159,8 @@ object Evaluator {
             (tok is Tok.Op && (tok.ch == '(' || tok.ch == '-' || tok.ch == '+'))
 
         private fun unary(): Double {
+            // Each operand consumption resets the percent marker; postfix may set it again.
+            lastPercentOperand = null
             val cur = peek()
             if (cur is Tok.Op && (cur.ch == '-' || cur.ch == '+')) {
                 p++
@@ -177,9 +184,25 @@ object Evaluator {
         private fun postfix(): Double {
             var v = primary()
             while (true) {
-                when {
-                    eatOp('!') -> v = factorial(v)
-                    eatOp('%') -> v /= 100.0
+                val cur = peek()
+                if (cur !is Tok.Op) return v
+                when (cur.ch) {
+                    '!' -> { p++; v = factorial(v) }
+                    '%' -> {
+                        val nextTok = t.getOrNull(p + 1)
+                        if (startsValue(nextTok)) {
+                            // Binary modulo: "5 % 3"
+                            p++
+                            val rhs = unary()
+                            if (rhs == 0.0) throw SyntaxException("Modulo by zero")
+                            v %= rhs
+                        } else {
+                            // Postfix percent: "50%" == 0.5
+                            p++
+                            lastPercentOperand = v
+                            v /= 100.0
+                        }
+                    }
                     else -> return v
                 }
             }
