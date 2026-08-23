@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kalku — UI Design Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0E0C0A;
+  --board:#151210;
+  --line:rgba(237,230,216,.08);
+  --ivory:#EDE6D8;
+  --muted:#9A9082;
+  --faint:#5E574C;
+  --copper:#E09E45;
+  --copper-deep:#B87A2E;
+  --brass:#C9A25A;
+  --key:#23201B;
+  --key-hi:#2C2822;
+  --vault-panel:#17211B;
+  --vault-line:rgba(157,184,154,.14);
+  --sage:#9DB89A;
+  --felt:#101812;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--ivory);
+  font-family:'Schibsted Grotesk',sans-serif;
+  min-height:100vh;
+}
+/* ---------- board chrome ---------- */
+.board-head{
+  padding:56px 48px 32px;
+  border-bottom:1px solid var(--line);
+  display:flex;align-items:flex-end;gap:48px;flex-wrap:wrap;
+}
+.board-head h1{
+  font-family:'Instrument Serif',serif;
+  font-weight:400;font-size:56px;line-height:1;
+  letter-spacing:-.01em;
+}
+.board-head h1 em{color:var(--copper);font-style:italic}
+.board-head .sub{
+  max-width:520px;color:var(--muted);font-size:15px;line-height:1.65;
+  padding-bottom:6px;
+}
+.board-head .sub b{color:var(--ivory);font-weight:600}
+.swatches{display:flex;gap:10px;margin-left:auto;padding-bottom:6px}
+.sw{width:44px;height:44px;border-radius:10px;border:1px solid var(--line);position:relative}
+.sw span{
+  position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);
+  font-family:'Chivo Mono',monospace;font-size:10px;color:var(--faint);white-space:nowrap;
+}
+.frames{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(400px,1fr));
+  gap:64px 40px;padding:72px 48px 120px;
+  max-width:1800px;margin:0 auto;
+}
+.frame-wrap{display:flex;flex-direction:column;align-items:center;gap:20px}
+.frame-label{
+  font-family:'Chivo Mono',monospace;font-size:12px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--faint);
+}
+.frame-label b{color:var(--brass);font-weight:500}
+.frame-note{
+  max-width:380px;text-align:center;color:var(--muted);font-size:13px;line-height:1.6;
+}
+.frame-note b{color:var(--sage);font-weight:600}
+
+/* ---------- phone ---------- */
+.phone{
+  width:392px;height:812px;border-radius:52px;
+  background:#070605;
+  border:1px solid rgba(237,230,216,.12);
+  box-shadow:0 40px 80px -30px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.06);
+  padding:10px;position:relative;flex:none;
+}
+.screen{
+  width:100%;height:100%;border-radius:43px;overflow:hidden;position:relative;
+  background:var(--board);display:flex;flex-direction:column;
+}
+.screen::after{ /* grain */
+  content:"";position:absolute;inset:0;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+}
+.notch{
+  position:absolute;top:12px;left:50%;transform:translateX(-50%);
+  width:118px;height:30px;border-radius:16px;background:#000;z-index:5;
+}
+.statusbar{
+  height:54px;flex:none;display:flex;align-items:flex-end;
+  justify-content:space-between;padding:0 26px 6px;
+  font-family:'Chivo Mono',monospace;font-size:12px;color:var(--muted);
+  position:relative;z-index:4;
+}
+.homebar{
+  position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
+  width:132px;height:4px;border-radius:2px;background:rgba(237,230,216,.22);z-index:5;
+}
+
+/* ---------- CALCULATOR ---------- */
+.calc{display:flex;flex-direction:column;height:100%;}
+.calc-top{
+  display:flex;align-items:center;gap:8px;padding:14px 18px 0;flex:none;
+  position:relative;z-index:4;
+}
+.chip{
+  font-family:'Chivo Mono',monospace;font-size:11px;letter-spacing:.14em;
+  color:var(--brass);border:1px solid rgba(201,162,90,.35);
+  padding:5px 12px;border-radius:999px;background:rgba(201,162,90,.07);
+}
+.seg{display:flex;border:1px solid rgba(201,162,90,.35);border-radius:999px;overflow:hidden}
+.seg i{
+  font-style:normal;font-family:'Chivo Mono',monospace;font-size:11px;letter-spacing:.1em;
+  padding:5px 12px;color:var(--muted);
+}
+.seg i.on{background:rgba(224,158,69,.16);color:var(--copper)}
+.iconbtn{
+  margin-left:auto;width:34px;height:34px;border-radius:50%;
+  display:grid;place-items:center;color:var(--muted);
+  border:1px solid transparent;
+}
+.iconbtn:hover{color:var(--ivory);border-color:var(--line)}
+.iconbtn svg{width:17px;height:17px}
+.calc-display{
+  flex:1;display:flex;flex-direction:column;justify-content:flex-end;
+  align-items:flex-end;padding:0 26px 18px;min-height:120px;position:relative;z-index:2;
+}
+.calc-display::before{
+  content:"";position:absolute;right:-40px;bottom:-80px;width:280px;height:280px;
+  background:radial-gradient(circle,rgba(224,158,69,.13),transparent 65%);pointer-events:none;
+}
+.expr{font-family:'Chivo Mono',monospace;font-size:17px;color:var(--muted);letter-spacing:.02em}
+.result{
+  font-family:'Chivo Mono',monospace;font-weight:300;font-size:64px;line-height:1.05;
+  letter-spacing:-.02em;color:var(--ivory);
+}
+.preview{font-family:'Chivo Mono',monospace;font-size:15px;color:var(--faint);margin-top:6px}
+.sci-pad{
+  flex:none;padding:0 14px;display:grid;grid-template-columns:repeat(6,1fr);gap:6px;
+  position:relative;z-index:4;
+}
+.sci-key{
+  height:38px;border-radius:11px;display:grid;place-items:center;
+  background:rgba(237,230,216,.045);border:1px solid rgba(237,230,216,.05);
+  font-family:'Chivo Mono',monospace;font-size:12px;color:var(--muted);
+  cursor:pointer;transition:.15s;
+}
+.sci-key:hover{background:rgba(224,158,69,.12);color:var(--copper)}
+.pad{
+  flex:none;padding:10px 14px 30px;display:grid;grid-template-columns:repeat(4,1fr);
+  gap:9px;position:relative;z-index:4;
+}
+.key{
+  aspect-ratio:1/.92;border-radius:22px;display:grid;place-items:center;
+  font-family:'Chivo Mono',monospace;font-size:24px;font-weight:400;
+  background:linear-gradient(180deg,var(--key-hi),var(--key));
+  border:1px solid rgba(237,230,216,.06);
+  box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 6px 14px -8px rgba(0,0,0,.8);
+  color:var(--ivory);cursor:pointer;user-select:none;transition:transform .08s,filter .15s;
+}
+.key:hover{filter:brightness(1.12)}
+.key:active{transform:scale(.94)}
+.key.op{color:var(--copper);font-size:26px;background:linear-gradient(180deg,#2A251E,#221E18)}
+.key.util{color:var(--muted);font-size:20px}
+.key.clear{color:#E07B5A}
+.key.eq{
+  background:linear-gradient(180deg,#EFAC55,#CE8434);
+  color:#241708;font-weight:500;border:none;
+  box-shadow:0 8px 22px -8px rgba(224,158,69,.55),0 1px 0 rgba(255,255,255,.35) inset;
+}
+
+/* ---------- VAULT DASHBOARD ---------- */
+.vault{background:linear-gradient(178deg,var(--felt) 0%,var(--board) 46%);height:100%;display:flex;flex-direction:column;position:relative;z-index:2}
+.vault-head{padding:16px 20px 4px;display:flex;align-items:baseline;flex:none}
+.vault-head h2{
+  font-family:'Instrument Serif',serif;font-weight:400;font-size:34px;letter-spacing:-.01em;
+}
+.vault-head h2 em{color:var(--sage)}
+.vault-head .spacer{flex:1}
+.pill-icon{
+  width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+  border:1px solid var(--vault-line);color:var(--sage);margin-left:8px;
+}
+.searchbar{
+  margin:12px 20px 4px;flex:none;display:flex;align-items:center;gap:10px;
+  background:rgba(237,230,216,.05);border:1px solid var(--vault-line);
+  border-radius:14px;padding:11px 14px;color:var(--faint);font-size:14px;
+}
+.storage-card{
+  margin:14px 20px 0;flex:none;border:1px solid var(--vault-line);
+  background:rgba(23,33,27,.55);border-radius:18px;padding:14px 16px;
+}
+.storage-card .row1{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+.storage-card .t{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);font-family:'Chivo Mono',monospace}
+.storage-card .v{font-family:'Chivo Mono',monospace;font-size:15px;color:var(--sage)}
+.bar-row{display:grid;grid-template-columns:76px 1fr 52px;gap:10px;align-items:center;margin-top:7px}
+.bar-row .n{font-size:12px;color:var(--muted)}
+.bar-row .b{height:5px;border-radius:3px;background:rgba(237,230,216,.06);overflow:hidden}
+.bar-row .b i{display:block;height:100%;border-radius:3px}
+.bar-row .s{font-family:'Chivo Mono',monospace;font-size:11px;color:var(--faint);text-align:right}
+.cats{padding:16px 20px 0;flex:none}
+.sec-label{
+  font-family:'Chivo Mono',monospace;font-size:11px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--faint);margin-bottom:10px;
+}
+.cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.cat{
+  border:1px solid var(--vault-line);border-radius:16px;padding:12px;
+  background:rgba(23,33,27,.4);cursor:pointer;transition:.15s;
+}
+.cat:hover{background:rgba(157,184,154,.08)}
+.cat .g{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;margin-bottom:9px}
+.cat .g svg{width:14px;height:14px}
+.cat .nm{font-size:13px;font-weight:500}
+.cat .ct{font-family:'Chivo Mono',monospace;font-size:11px;color:var(--faint);margin-top:2px}
+.recent{flex:1;overflow:hidden;padding:14px 12px 0;position:relative;z-index:2}
+.frow{
+  display:flex;align-items:center;gap:12px;padding:9px 8px;border-radius:12px;
+}
+.frow:hover{background:rgba(237,230,216,.04)}
+.frow .glyph{
+  width:36px;height:36px;border-radius:10px;flex:none;display:grid;place-items:center;
+}
+.frow .glyph svg{width:16px;height:16px}
+.frow .meta{flex:1;min-width:0}
+.frow .fn{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.frow .fs{font-family:'Chivo Mono',monospace;font-size:11px;color:var(--faint);margin-top:1px}
+.bottomnav{
+  flex:none;margin:8px 14px 22px;border-radius:20px;
+  background:rgba(23,33,27,.8);border:1px solid var(--vault-line);
+  display:flex;justify-content:space-around;padding:10px 6px;position:relative;z-index:4;
+}
+.bn{display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--faint);font-size:10px;font-family:'Chivo Mono',monospace;letter-spacing:.06em;cursor:pointer;width:56px}
+.bn svg{width:19px;height:19px}
+.bn.on{color:var(--brass)}
+
+/* ---------- BROWSER ---------- */
+.brw{height:100%;display:flex;flex-direction:column;background:var(--board);position:relative;z-index:2}
+.appbar{padding:14px 18px 10px;flex:none;display:flex;align-items:center;gap:6px}
+.crumb{font-size:16px;font-weight:600;flex:1}
+.crumb span{color:var(--faint);font-weight:400}
+.selbar{
+  margin:0 18px 10px;flex:none;display:flex;align-items:center;gap:4px;
+  background:rgba(224,158,69,.12);border:1px solid rgba(224,158,69,.35);
+  border-radius:14px;padding:6px 8px;
+}
+.selbar .count{
+  font-family:'Chivo Mono',monospace;font-size:12px;color:var(--copper);padding:0 10px 0 6px;
+}
+.selbar .act{flex:1;display:flex;justify-content:space-around}
+.selbar .abtn{color:var(--ivory);opacity:.85;display:grid;place-items:center;width:36px;height:32px;border-radius:9px;cursor:pointer;font-family:'Chivo Mono',monospace;font-size:11px}
+.selbar .abtn:hover{background:rgba(224,158,69,.18);opacity:1}
+.selbar .abtn.danger{color:#E07B5A}
+.tile-grid{flex:1;padding:4px 16px;display:grid;grid-template-columns:repeat(3,1fr);gap:9px;align-content:start;position:relative;z-index:2}
+.tile{
+  border-radius:16px;border:1px solid var(--line);overflow:hidden;cursor:pointer;
+  background:var(--key);transition:.15s;position:relative;
+}
+.tile.sel{border-color:var(--copper);box-shadow:0 0 0 1px var(--copper)}
+.thumb{aspect-ratio:1;display:grid;place-items:center;position:relative}
+.thumb.doc{background:linear-gradient(145deg,#26303F,#1A222D);color:#8FB2DC}
+.thumb.img{background:linear-gradient(145deg,#2E4237,#1C2A22);color:#9DB89A}
+.thumb.arc{background:linear-gradient(145deg,#42341F,#2A2114);color:#D9B36A}
+.thumb.code{background:linear-gradient(145deg,#3A2A3E,#241B26);color:#C79BD1}
+.thumb svg{width:26px;height:26px}
+.check{
+  position:absolute;top:8px;right:8px;width:20px;height:20px;border-radius:50%;
+  border:1.5px solid rgba(237,230,216,.4);display:grid;place-items:center;background:rgba(0,0,0,.35);
+}
+.check.on{background:var(--copper);border-color:var(--copper);color:#241708}
+.tname{padding:8px 10px 10px;font-size:12px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ivory)}
+.fab{
+  position:absolute;bottom:26px;right:22px;height:52px;padding:0 22px;border-radius:18px;
+  background:linear-gradient(180deg,#EFAC55,#CE8434);color:#241708;font-weight:700;font-size:15px;
+  display:flex;align-items:center;gap:8px;box-shadow:0 14px 30px -10px rgba(224,158,69,.5);
+  cursor:pointer;z-index:6;border:none;
+}
+
+/* ---------- EDITOR ---------- */
+.ed{height:100%;display:flex;flex-direction:column;background:#131110;position:relative;z-index:2}
+.ed-bar{padding:12px 14px 10px;flex:none;display:flex;align-items:center;gap:2px}
+.ed-title{flex:1;min-width:0;padding:0 8px}
+.ed-title .fn{font-family:'Chivo Mono',monospace;font-size:14px;color:var(--ivory)}
+.ed-title .st{font-family:'Chivo Mono',monospace;font-size:10.5px;color:var(--faint);margin-top:2px}
+.ed-title .dirty{color:var(--copper)}
+.ed-body{flex:1;display:flex;min-height:0;position:relative}
+.gutter{
+  flex:none;width:44px;padding:14px 0;text-align:right;
+  font-family:'Chivo Mono',monospace;font-size:12.5px;line-height:1.75;
+  color:rgba(237,230,216,.18);border-right:1px solid var(--line);
+  background:rgba(0,0,0,.18);
+}
+.gutter div{padding-right:10px}
+.gutter div.cur{color:var(--copper);background:rgba(224,158,69,.07)}
+.code{
+  flex:1;padding:14px 14px;font-family:'Chivo Mono',monospace;font-size:12.5px;
+  line-height:1.75;white-space:pre;overflow:hidden;color:#C9C2B4;
+}
+.code .kw{color:#C79BD1}.code .fn{color:#8FB2DC}.code .str{color:#9DB89A}.code .cm{color:#5E574C;font-style:italic}
+.code .curline{background:rgba(224,158,69,.06);margin:0 -14px;padding:0 14px;display:inline-block;width:calc(100% + 28px)}
+.ed-status{
+  flex:none;display:flex;gap:8px;padding:8px 16px 24px;
+  font-family:'Chivo Mono',monospace;font-size:10.5px;color:var(--faint);
+  border-top:1px solid var(--line);
+}
+.ed-status .chip2{border:1px solid var(--line);border-radius:999px;padding:3px 10px}
+.ed-status .chip2.on{color:var(--brass);border-color:rgba(201,162,90,.4)}
+
+/* ---------- SETTINGS ---------- */
+.set{height:100%;display:flex;flex-direction:column;background:var(--board);position:relative;z-index:2}
+.set-body{flex:1;overflow:hidden;padding:4px 18px 20px}
+.group{margin-bottom:16px}
+.group>.sec-label{margin-bottom:8px}
+.card{border:1px solid var(--line);border-radius:16px;background:rgba(237,230,216,.025);overflow:hidden}
+.srow{
+  display:flex;align-items:center;gap:12px;padding:13px 15px;
+  border-top:1px solid var(--line);font-size:14px;
+}
+.srow:first-child{border-top:none}
+.srow .lbl{flex:1}
+.srow .hint{font-size:11.5px;color:var(--faint);margin-top:2px}
+.toggle{
+  width:42px;height:24px;border-radius:12px;background:rgba(237,230,216,.1);
+  position:relative;flex:none;cursor:pointer;
+}
+.toggle::after{
+  content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;
+  background:#8A8175;transition:.2s;
+}
+.toggle.on{background:var(--copper)}
+.toggle.on::after{left:21px;background:#fff}
+.accent-dots{display:flex;gap:9px}
+.adot{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent}
+.adot.on{border-color:var(--ivory)}
+.warnbox{
+  margin:2px 15px 12px;padding:10px 12px;border-radius:11px;
+  background:rgba(224,123,90,.09);border:1px solid rgba(224,123,90,.3);
+  color:#E8A18B;font-size:12px;line-height:1.55;
+}
+</style>
+</head>
+<body>
+
+<header class="board-head">
+  <h1>Kalku<br><em>UI Direction — Precision&nbsp;Archive</em></h1>
+  <p class="sub"><b>Satu bahasa visual, dua wajah.</b> Kalkulator tampil seperti instrumen ukur premium: grafit hangat, angka monospace besar, satu aksen tembaga. Vault membuka nuansa arsip pribadi: felt hijau gelap, kuningan, dan aksen serif — tetap satu keluarga warna sehingga transisi unlock terasa mulus, bukan pindah aplikasi.</p>
+  <div class="swatches">
+    <div class="sw" style="background:#12100E"><span>#12100E</span></div>
+    <div class="sw" style="background:#23201B"><span>key</span></div>
+    <div class="sw" style="background:#E09E45"><span>copper</span></div>
+    <div class="sw" style="background:#17211B;border-color:rgba(157,184,154,.3)"><span>vault</span></div>
+    <div class="sw" style="background:#9DB89A"><span>sage</span></div>
+    <div class="sw" style="background:#EDE6D8"><span>ivory</span></div>
+  </div>
+</header>
+
+<main class="frames">
+
+<!-- ==================== CALCULATOR BASIC ==================== -->
+<div class="frame-wrap">
+  <div class="phone"><div class="screen"><div class="notch"></div>
+    <div class="statusbar"><span>21:47</span><span>LTE ▮▮▮</span></div>
+    <div class="calc">
+      <div class="calc-top">
+        <div class="chip">DEG</div>
+        <div style="flex:1"></div>
+        <div class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 8v4l2.5 2.5"/><circle cx="12" cy="12" r="9"/></svg></div>
+        <div class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="3" width="8" height="18" rx="2"/><path d="M12 18h.01"/></svg></div>
+      </div>
+      <div class="calc-display">
+        <div class="expr">12 + 7 × 3 − 4</div>
+        <div class="result">29</div>
+        <div class="preview">history: 21:44 · 128 × 4 = 512</div>
+      </div>
+      <div class="pad">
+        <div class="key clear util">C</div>
+        <div class="key util">(</div>
+        <div class="key util">)</div>
+        <div class="key op">÷</div>
+        <div class="key">7</div><div class="key">8</div><div class="key">9</div>
+        <div class="key op">×</div>
+        <div class="key">4</div><div class="key">5</div><div class="key">6</div>
+        <div class="key op">−</div>
+        <div class="key">1</div><div class="key">2</div><div class="key">3</div>
+        <div class="key op">+</div>
+        <div class="key util">⌫</div>
+        <div class="key">0</div>
+        <div class="key util">·</div>
+        <div class="key eq">=</div>
+      </div>
+    </div>
+  </div><div class="homebar"></div></div>
+  <div class="frame-label"><b>CALCULATOR</b> · BASIC MODE</div>
+  <p class="frame-note">Wajah depan harus meyakinkan sebagai kalkulator sungguhan: <b>display besar tanpa gangguan</b>, tombol squircle bertekstur dengan tekan aktif, ikon riwayat & paste di pojok — tidak ada petunjuk ke vault.</p>
+</div>
+
+<!-- ==================== CALCULATOR SCIENTIFIC ==================== -->
+<div class="frame-wrap">
+  <div class="phone"><div class="screen"><div class="notch"></div>
+    <div class="statusbar"><span>21:47</span><span>LTE ▮▮▮</span></div>
+    <div class="calc">
+      <div class="calc-top">
+        <div class="seg"><i class="on">DEG</i><i>RAD</i></div>
+        <div style="flex:1"></div>
+        <div class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 8v4l2.5 2.5"/><circle cx="12" cy="12" r="9"/></svg></div>
+        <div class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h16M7 16l10-10M14 6h3v3" /></svg></div>
+      </div>
+      <div class="calc-display">
+        <div class="expr">√(144) + sin(30) × π</div>
+        <div class="result">13.571</div>
+        <div class="preview">= 12 + 0.5π…</div>
+      </div>
+      <div class="sci-pad">
+        <div class="sci-key">sin</div><div class="sci-key">cos</div><div class="sci-key">tan</div>
+        <div class="sci-key">ln</div><div class="sci-key">log</div><div class="sci-key">√(</div>
+        <div class="sci-key">asin</div><div class="sci-key">acos</div><div class="sci-key">atan</div>
+        <div class="sci-key">exp</div><div class="sci-key">%</div><div class="sci-key">!</div>
+      </div>
+      <div class="pad" style="padding-top:8px">
+        <div class="key clear util">C</div>
+        <div class="key util">(</div>
+        <div class="key util">)</div>
+        <div class="key op">÷</div>
+        <div class="key">7</div><div class="key">8</div><div class="key">9</div>
+        <div class="key op">×</div>
+        <div class="key">4</div><div class="key">5</div><div class="key">6</div>
+        <div class="key op">−</div>
+        <div class="key">1</div><div class="key">2</div><div class="key">3</div>
+        <div class="key op">+</div>
+        <div class="key util">π</div>
+        <div class="key">0</div>
+        <div class="key util">^</div>
+        <div class="key eq">=</div>
+      </div>
+    </div>
+  </div><div class="homebar"></div></div>
+  <div class="frame-label"><b>CALCULATOR</b> · SCIENTIFIC MODE</div>
+  <p class="frame-note">Mode ilmiah berupa <b>satu strip tombol kecil tambahan</b>, bukan grid penuh — kalkulator tetap terasa ringan. DEG/RAD jadi segmented control. Konstanta π & pangkat dipindah ke baris utama saat mode sci aktif.</p>
+</div>
+
+<!-- ==================== VAULT DASHBOARD ==================== -->
+<div class="frame-wrap">
+  <div class="phone"><div class="screen"><div class="notch"></div>
+    <div class="statusbar"><span>21:48</span><span>LTE ▮▮▮</span></div>
+    <div class="vault">
+      <div class="vault-head">
+        <h2>Vault <em>privat</em></h2>
+        <div class="spacer"></div>
+        <div class="pill-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></div>
+        <div class="pill-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1 1.55V21a2 2 0 11-4 0v-.09a1.7 1.7 0 00-1-1.55 1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-1.55-1H3a2 2 0 110-4h.09a1.7 1.7 0 001.55-1 1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06A1.7 1.7 0 009 4.6a1.7 1.7 0 001-1.55V3a2 2 0 114 0v.09a1.7 1.7 0 001 1.55 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06A1.7 1.7 0 0021.4 9c.26.61.85 1 1.51 1"/></svg></div>
+      </div>
+      <div class="searchbar">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+        Cari file, folder, tag…
+      </div>
+      <div class="storage-card">
+        <div class="row1"><span class="t">Storage terpakai</span><span class="v">12.4 GB</span></div>
+        <div class="bar-row"><span class="n">Photos</span><div class="b"><i style="width:78%;background:#9DB89A"></i></div><span class="s">8.1 GB</span></div>
+        <div class="bar-row"><span class="n">Videos</span><div class="b"><i style="width:46%;background:#8FB2DC"></i></div><span class="s">2.4 GB</span></div>
+        <div class="bar-row"><span class="n">Documents</span><div class="b"><i style="width:22%;background:#D9B36A"></i></div><span class="s">1.2 GB</span></div>
+        <div class="bar-row"><span class="n">Code</span><div class="b"><i style="width:9%;background:#C79BD1"></i></div><span class="s">80 MB</span></div>
+      </div>
+      <div class="cats">
+        <div class="sec-label">Categories</div>
+        <div class="cat-grid">
+          <div class="cat"><div class="g" style="background:rgba(157,184,154,.15);color:#9DB89A"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg></div><div class="nm">Photos</div><div class="ct">214 file</div></div>
+          <div class="cat"><div class="g" style="background:rgba(143,178,220,.15);color:#8FB2DC"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3"/></svg></div><div class="nm">Videos</div><div class="ct">37 file</div></div>
+          <div class="cat"><div class="g" style="background:rgba(217,179,106,.15);color:#D9B36A"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div><div class="nm">Audio</div><div class="ct">96 file</div></div>
+          <div class="cat"><div class="g" style="background:rgba(237,230,216,.12);color:#EDE6D8"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></div><div class="nm">Docs</div><div class="ct">58 file</div></div>
+          <div class="cat"><div class="g" style="background:rgba(199,155,209,.15);color:#C79BD1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg></div><div class="nm">Code</div><div class="ct">142 file</div></div>
+          <div class="cat"><div class="g" style="background:rgba(224,158,69,.15);color:#E09E45"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg></div><div class="nm">Archives</div><div class="ct">12 file</div></div>
+        </div>
+      </div>
+      <div class="recent">
+        <div class="sec-label">Recent</div>
+        <div class="frow"><div class="glyph" style="background:rgba(157,184,154,.14);color:#9DB89A"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg></div><div class="meta"><div class="fn">liburan_bali.jpg</div><div class="fs">2.4 MB · 10 mnt lalu</div></div></div>
+        <div class="frow"><div class="glyph" style="background:rgba(199,155,209,.14);color:#C79BD1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg></div><div class="meta"><div class="fn">main.dart</div><div class="fs">8 KB · 1 jam lalu</div></div></div>
+        <div class="frow"><div class="glyph" style="background:rgba(237,230,216,.1);color:#EDE6D8"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></div><div class="meta"><div class="fn">tugas_kelompok.pdf</div><div class="fs">1.1 MB · kemarin</div></div></div>
+      </div>
+      <div class="bottomnav">
+        <div class="bn on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 10l9-7 9 7v10a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>HOME</div>
+        <div class="bn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>BROWSE</div>
+        <div class="bn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>GALERI</div>
+        <div class="bn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>SAMPAH</div>
+      </div>
+    </div>
+  </div><div class="homebar"></div></div>
+  <div class="frame-label"><b>VAULT</b> · DASHBOARD</div>
+  <p class="frame-note">Nuansa berubah halus ke <b>felt hijau + serif italic</b> setelah unlock. Storage analyzer jadi kartu horizontal-bar; kategori pakai glyph berwarna; <b>bottom nav baru</b> (Home/Browse/Galeri/Sampah) untuk navigasi cepat.</p>
+</div>
+
+<!-- ==================== BROWSER MULTI-SELECT ==================== -->
+<div class="frame-wrap">
+  <div class="phone"><div class="screen"><div class="notch"></div>
+    <div class="statusbar"><span>21:49</span><span>LTE ▮▮▮</span></div>
+    <div class="brw">
+      <div class="appbar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9A9082" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        <div class="crumb">Photos <span>/ 2026</span></div>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9A9082" stroke-width="1.8"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><path d="M13 13h8v8h-8z" opacity=".35"/></svg>
+        <svg style="margin-left:10px" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9A9082" stroke-width="1.8"><path d="M3 6h18M7 12h10M11 18h2"/></svg>
+      </div>
+      <div class="selbar">
+        <span class="count">2 dipilih</span>
+        <div class="act">
+          <div class="abtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></div>
+          <div class="abtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></div>
+          <div class="abtn">ZIP</div>
+          <div class="abtn danger"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></div>
+          <div class="abtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6L6 18M6 6l12 12"/></svg></div>
+        </div>
+      </div>
+      <div class="tile-grid">
+        <div class="tile sel"><div class="thumb img"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg><div class="check on"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4"><path d="M20 6L9 17l-5-5"/></svg></div></div><div class="tname">pantai_01.jpg</div></div>
+        <div class="tile"><div class="thumb img"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg></div><div class="tname">gunung.jpg</div></div>
+        <div class="tile sel"><div class="thumb img"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg><div class="check on"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4"><path d="M20 6L9 17l-5-5"/></svg></div></div><div class="tname">sunset.png</div></div>
+        <div class="tile"><div class="thumb doc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></div><div class="tname">catatan.txt</div></div>
+        <div class="tile"><div class="thumb arc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg></div><div class="tname">backup.zip</div></div>
+        <div class="tile"><div class="thumb code"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg></div><div class="tname">widget.kt</div></div>
+        <div class="tile"><div class="thumb img"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg></div><div class="tname">danau.jpg</div></div>
+        <div class="tile"><div class="thumb doc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></div><div class="tname">resep.csv</div></div>
+        <div class="tile"><div class="thumb arc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg></div><div class="tname">proyek.tar.gz</div></div>
+      </div>
+      <button class="fab">+ Import</button>
+    </div>
+  </div><div class="homebar"></div></div>
+  <div class="frame-label"><b>BROWSER</b> · GRID + MULTI-SELECT</div>
+  <p class="frame-note">Tile dengan <b>warna kategori</b> (foto sage, dokumen biru, arsip kuning, kode ungu) biar beda jenis file terbaca sekilas. Multi-select memunculkan <b>action bar mengambang tembaga</b> — share/move/zip/hapus tanpa menu berlapis.</p>
+</div>
+
+<!-- ==================== TEXT/CODE EDITOR ==================== -->
+<div class="frame-wrap">
+  <div class="phone"><div class="screen"><div class="notch"></div>
+    <div class="statusbar"><span>21:51</span><span>LTE ▮▮▮</span></div>
+    <div class="ed">
+      <div class="ed-bar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9A9082" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        <div class="ed-title">
+          <div class="fn">main.dart <span class="dirty">•</span></div>
+          <div class="st">Documents / flutter · disimpan 21:50</div>
+        </div>
+        <div class="iconbtn" style="color:#C79BD1;opacity:.55"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6M15 17l6-6-6-6M21 7v6h-6M9 17l-6 6 6 6" transform="scale(.8) translate(3 3)"/></svg></div>
+        <div class="iconbtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></div>
+        <div class="iconbtn" style="color:var(--brass)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg></div>
+      </div>
+      <div class="ed-body">
+        <div class="gutter">
+          <div>1</div><div>2</div><div>3</div><div class="cur">4</div><div>5</div><div>6</div>
+          <div>7</div><div>8</div><div>9</div><div>10</div><div>11</div><div>12</div>
+        </div>
+        <div class="code"><span class="kw">import</span> 'package:flutter/material.dart';
+
+<span class="kw">void</span> <span class="fn">main</span>() {
+  <span class="fn">runApp</span>(<span class="kw">const</span> KalkuApp());
+}
+
+<span class="cm">// vault entry point — jangan
+// expose route ini di luar lock</span>
+<span class="kw">class</span> <span class="fn">KalkuApp</span> <span class="kw">extends</span> StatelessWidget {
+  <span class="kw">@override</span>
+  Widget <span class="fn">build</span>(BuildContext ctx) {
+    <span class="kw">return</span> <span class="str">'…'</span>;
+  }</div>
+      </div>
+      <div class="ed-status">
+        <span class="chip2 on">MONO 14</span>
+        <span class="chip2">WRAP</span>
+        <span class="chip2">#</span>
+        <span style="flex:1"></span>
+        <span>23 baris · 214 kata</span>
+      </div>
+    </div>
+  </div><div class="homebar"></div></div>
+  <div class="frame-label"><b>EDITOR</b> · TEKS &amp; KODE</div>
+  <p class="frame-note">Monospace Chivo dengan <b>syntax tint lembut</b> (ungu keyword, biru fungsi, sage string), gutter nomor baris dengan highlight baris aktif tembaga. Status bar bawah: font size, wrap, line/word count.</p>
+</div>
+
+<!-- ==================== SETTINGS ==================== -->
+<div class="frame-wrap">
+  <div class="phone"><div class="screen"><div class="notch"></div>
+    <div class="statusbar"><span>21:53</span><span>LTE ▮▮▮</span></div>
+    <div class="set">
+      <div class="appbar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9A9082" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        <div class="crumb">Pengaturan</div>
+      </div>
+      <div class="set-body">
+        <div class="group">
+          <div class="sec-label">Tampilan</div>
+          <div class="card">
+            <div class="srow"><span class="lbl">Tema</span>
+              <div class="seg"><i>Sistem</i><i>Terang</i><i class="on">Gelap</i></div>
+            </div>
+            <div class="srow"><span class="lbl">Warna aksen</span>
+              <div class="accent-dots">
+                <div class="adot on" style="background:#E09E45"></div>
+                <div class="adot" style="background:#1565C0"></div>
+                <div class="adot" style="background:#3949AB"></div>
+                <div class="adot" style="background:#2E7D32"></div>
+                <div class="adot" style="background:#AD1457"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="group">
+          <div class="sec-label">Keamanan</div>
+          <div class="card">
+            <div class="srow"><span class="lbl">Ganti PIN</span><span style="color:var(--faint)">›</span></div>
+            <div class="srow"><span class="lbl">Auto-lock saat di background<span class="hint">Kunci vault otomatis</span></span>
+              <div class="seg"><i>Off</i><i>1m</i><i class="on">5m</i><i>15m</i></div>
+            </div>
+            <div class="srow"><span class="lbl">Biometrik<span class="hint">Sidik jari sebagai alternatif</span></span><div class="toggle"></div></div>
+          </div>
+        </div>
+        <div class="group">
+          <div class="sec-label">Vault</div>
+          <div class="card">
+            <div class="srow"><span class="lbl">Lokasi penyimpanan<span class="hint" style="font-family:'Chivo Mono',monospace;font-size:10px">/storage/emulated/0/.KalkuVault</span></span></div>
+          </div>
+          <div class="warnbox">⚠ Fallback privat aktif — beri izin <b>All files access</b> agar file bertahan setelah uninstall.</div>
+          <div class="card">
+            <div class="srow"><span class="lbl">Rebuild index<span class="hint">Scan ulang & bangun ulang metadata</span></span><span style="color:var(--faint)">›</span></div>
+            <div class="srow"><span class="lbl">Recycle bin auto-clean</span>
+              <div class="seg"><i>Off</i><i class="on">30h</i><i>60h</i></div>
+            </div>
+          </div>
+        </div>
+        <div class="group">
+          <div class="sec-label">Editor</div>
+          <div class="card">
+            <div class="srow"><span class="lbl">Font size</span><span class="chip" style="font-size:11px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);font-family:'Chivo Mono',monospace;color:var(--muted)">− &nbsp;14&nbsp; +</span></div>
+            <div class="srow"><span class="lbl">Word wrap</span><div class="toggle on"></div></div>
+            <div class="srow"><span class="lbl">Line numbers</span><div class="toggle on"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div><div class="homebar"></div></div>
+  <div class="frame-label"><b>SETTINGS</b> · KELOMPOKKAN</div>
+  <p class="frame-note">Section eyebrow label monospace, kartu bergaris tipis, <b>segmented control dipakai konsisten</b> untuk pilihan diskrit (DEG/RAD, auto-lock, retention). Peringatan fallback storage tampil jujur dengan kotak aksen.</p>
+</div>
+
+</main>
+<footer style="padding:0 48px 80px;color:var(--faint);font-size:13px;line-height:1.7;max-width:900px">
+  <p style="margin-bottom:8px"><b style="color:var(--muted)">Catatan implementasi → Compose:</b> palet di atas dipetakan ke Material3 ColorScheme (primary=copper, background=felt/graphit, surfaceVariant=key); font Chivo Mono untuk angka & kode, Instrument Serif hanya untuk judul vault; bentuk tombol pakai RoundedCornerShape(22dp) + gradasi vertikal tipis; grain noise dibuat via drawWithContent alpha rendah.</p>
+</footer>
+</body>
+</html>

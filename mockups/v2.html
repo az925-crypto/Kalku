@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kalku — UI Design Board v2 — Atelier Paper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FFFBF0;
+  --paper2:#F3EDE0;
+  --board:#EDE8DC;
+  --ink:#1C1B19;
+  --muted:#8A8680;
+  --faint:#B8B2A6;
+  --line:#E8DDC8;
+  --line2:#EDE3CF;
+  --vermillion:#D6402A;
+  --vermillion-deep:#B83222;
+  --teal:#1E4E3F;
+  --teal2:#2A6B5A;
+  --sage:#8FA89B;
+  --sage-light:#E6F0EB;
+  --wood:#B89A6A;
+  --key:#FFFFFF;
+  --key2:#F8F5EF;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  background:var(--board);
+  color:var(--ink);
+  font-family:'DM Sans',sans-serif;
+  min-height:100vh;
+}
+/* board head */
+.board-head{
+  padding:56px 48px 36px;
+  border-bottom:1px solid var(--line);
+  display:flex;align-items:flex-end;gap:48px;flex-wrap:wrap;
+  background:linear-gradient(180deg, var(--paper) 0%, var(--board) 100%);
+}
+.board-head h1{
+  font-family:'Cormorant Garamond',serif;
+  font-weight:400;font-size:54px;line-height:.95;letter-spacing:-.02em;
+}
+.board-head h1 em{font-style:italic;color:var(--teal2)}
+.board-head .sub{
+  max-width:560px;color:var(--muted);font-size:15px;line-height:1.7;
+  padding-bottom:4px;
+}
+.board-head .sub b{color:var(--ink);font-weight:700}
+.swatches{display:flex;gap:10px;margin-left:auto;padding-bottom:4px;flex-wrap:wrap}
+.sw{width:42px;height:42px;border-radius:10px;border:1px solid var(--line);position:relative;flex:none}
+.sw span{
+  position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);
+  font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--faint);white-space:nowrap;
+}
+.frames{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(400px,1fr));
+  gap:64px 40px;padding:64px 48px 120px;
+  max-width:1800px;margin:0 auto;
+}
+.frame-wrap{display:flex;flex-direction:column;align-items:center;gap:18px}
+.frame-label{
+  font-family:'JetBrains Mono',monospace;font-size:11.5px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--faint);
+}
+.frame-label b{color:var(--teal2);font-weight:500}
+.frame-note{
+  max-width:380px;text-align:center;color:var(--muted);font-size:13px;line-height:1.65;
+}
+.frame-note b{color:var(--teal);font-weight:700}
+/* phone */
+.phone{
+  width:392px;height:812px;border-radius:52px;
+  background:#0F0E0D;
+  border:1px solid rgba(0,0,0,.18);
+  box-shadow:0 36px 72px -28px rgba(28,27,25,.35), inset 0 1px 0 rgba(255,255,255,.08);
+  padding:10px;position:relative;flex:none;
+}
+.screen{
+  width:100%;height:100%;border-radius:43px;overflow:hidden;position:relative;
+  background:var(--paper);display:flex;flex-direction:column;
+}
+.screen::after{
+  content:"";position:absolute;inset:0;pointer-events:none;opacity:.06;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+}
+.notch{
+  position:absolute;top:12px;left:50%;transform:translateX(-50%);
+  width:118px;height:30px;border-radius:16px;background:#000;z-index:5;
+}
+.statusbar{
+  height:54px;flex:none;display:flex;align-items:flex-end;
+  justify-content:space-between;padding:0 26px 6px;
+  font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);
+  position:relative;z-index:4;
+  border-bottom:1px solid transparent;
+}
+.homebar{
+  position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
+  width:132px;height:4px;border-radius:2px;background:rgba(28,27,25,.18);z-index:5;
+}
+/* CALC */
+.calc{display:flex;flex-direction:column;height:100%;}
+.calc-top{
+  display:flex;align-items:center;gap:8px;padding:14px 18px 0;flex:none;
+  position:relative;z-index:4;
+}
+.chip{
+  font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;
+  color:var(--teal2);border:1px solid rgba(30,78,63,.18);
+  padding:5px 12px;border-radius:999px;background:var(--sage-light);
+}
+.seg{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--key)}
+.seg i{
+  font-style:normal;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;
+  padding:5px 12px;color:var(--muted);
+}
+.seg i.on{background:var(--ink);color:var(--paper)}
+.iconbtn{
+  margin-left:auto;width:34px;height:34px;border-radius:50%;
+  display:grid;place-items:center;color:var(--muted);
+  border:1px solid var(--line);background:var(--key);
+}
+.iconbtn svg{width:17px;height:17px}
+.calc-display{
+  flex:1;display:flex;flex-direction:column;justify-content:flex-end;
+  align-items:flex-end;padding:0 26px 18px;min-height:118px;position:relative;z-index:2;
+  border-bottom:1px solid var(--line2);
+  background:linear-gradient(180deg, var(--paper) 30%, var(--paper2) 100%);
+}
+.expr{font-family:'JetBrains Mono',monospace;font-size:16px;color:var(--muted);letter-spacing:.02em}
+.result{
+  font-family:'JetBrains Mono',monospace;font-weight:400;font-size:62px;line-height:1.05;
+  letter-spacing:-.03em;color:var(--ink);
+}
+.preview{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--faint);margin-top:6px}
+.sci-pad{
+  flex:none;padding:8px 14px 0;display:grid;grid-template-columns:repeat(6,1fr);gap:6px;
+  position:relative;z-index:4;
+}
+.sci-key{
+  height:36px;border-radius:10px;display:grid;place-items:center;
+  background:var(--key);border:1px solid var(--line);
+  font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--muted);
+  cursor:pointer;transition:.15s;
+}
+.sci-key:hover{border-color:var(--teal2);color:var(--teal2);background:var(--sage-light)}
+.pad{
+  flex:none;padding:12px 14px 28px;display:grid;grid-template-columns:repeat(4,1fr);
+  gap:9px;position:relative;z-index:4;
+}
+.key{
+  aspect-ratio:1/.92;border-radius:20px;display:grid;place-items:center;
+  font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:400;
+  background:var(--key);
+  border:1px solid var(--line);
+  box-shadow:0 1px 0 rgba(255,255,255,.7) inset, 0 4px 10px -6px rgba(28,27,25,.15);
+  color:var(--ink);cursor:pointer;user-select:none;transition:transform .08s, box-shadow .15s, border-color .15s;
+}
+.key:hover{border-color:rgba(28,27,25,.18);box-shadow:0 1px 0 rgba(255,255,255,.7) inset, 0 6px 16px -8px rgba(28,27,25,.2)}
+.key:active{transform:scale(.96)}
+.key.op{color:var(--teal2);background:var(--sage-light);border-color:rgba(30,78,63,.14)}
+.key.util{color:var(--muted);font-size:20px;background:var(--paper2)}
+.key.clear{color:var(--vermillion);border-color:rgba(214,64,42,.18);background:#FFF1EF}
+.key.eq{
+  background:var(--vermillion);color:#FFFBF0;font-weight:500;border-color:var(--vermillion-deep);
+  box-shadow:0 8px 20px -10px rgba(214,64,42,.55), 0 1px 0 rgba(255,255,255,.25) inset;
+}
+/* VAULT */
+.vault{background:var(--paper);height:100%;display:flex;flex-direction:column;position:relative;z-index:2}
+.vault-head{padding:18px 20px 6px;display:flex;align-items:baseline;flex:none}
+.vault-head h2{
+  font-family:'Cormorant Garamond',serif;font-weight:400;font-size:32px;letter-spacing:-.015em;
+}
+.vault-head h2 em{font-style:italic;color:var(--teal2)}
+.vault-head .spacer{flex:1}
+.pill-icon{
+  width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+  border:1px solid var(--line);color:var(--teal2);margin-left:8px;background:var(--key);
+}
+.searchbar{
+  margin:10px 20px 4px;flex:none;display:flex;align-items:center;gap:10px;
+  background:var(--key);border:1px solid var(--line);
+  border-radius:14px;padding:11px 14px;color:var(--faint);font-size:14px;
+  box-shadow:0 2px 8px -6px rgba(28,27,25,.12);
+}
+.storage-card{
+  margin:14px 20px 0;flex:none;border:1px solid var(--line);
+  background:var(--key);border-radius:18px;padding:14px 16px;
+  box-shadow:0 4px 16px -10px rgba(28,27,25,.12);
+}
+.storage-card .row1{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+.storage-card .t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);font-family:'JetBrains Mono',monospace}
+.storage-card .v{font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--teal2);font-weight:500}
+.bar-row{display:grid;grid-template-columns:76px 1fr 52px;gap:10px;align-items:center;margin-top:7px}
+.bar-row .n{font-size:12px;color:var(--muted)}
+.bar-row .b{height:5px;border-radius:3px;background:var(--paper2);overflow:hidden}
+.bar-row .b i{display:block;height:100%;border-radius:3px}
+.bar-row .s{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--faint);text-align:right}
+.cats{padding:16px 20px 0;flex:none}
+.sec-label{
+  font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--faint);margin-bottom:10px;
+}
+.cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.cat{
+  border:1px solid var(--line);border-radius:16px;padding:12px;
+  background:var(--key);cursor:pointer;transition:.15s;
+  box-shadow:0 2px 10px -8px rgba(28,27,25,.15);
+}
+.cat:hover{border-color:rgba(30,78,63,.18);transform:translateY(-1px)}
+.cat .g{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;margin-bottom:9px}
+.cat .g svg{width:14px;height:14px}
+.cat .nm{font-size:13px;font-weight:700;color:var(--ink)}
+.cat .ct{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--faint);margin-top:2px}
+.recent{flex:1;overflow:hidden;padding:14px 12px 0;position:relative;z-index:2}
+.frow{
+  display:flex;align-items:center;gap:12px;padding:9px 8px;border-radius:12px;
+}
+.frow:hover{background:var(--paper2)}
+.frow .glyph{
+  width:36px;height:36px;border-radius:10px;flex:none;display:grid;place-items:center;
+  border:1px solid var(--line);
+}
+.frow .glyph svg{width:16px;height:16px}
+.frow .meta{flex:1;min-width:0}
+.frow .fn{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+.frow .fs{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--faint);margin-top:1px}
+.bottomnav{
+  flex:none;margin:8px 14px 22px;border-radius:20px;
+  background:var(--ink);display:flex;justify-content:space-around;padding:10px 6px;position:relative;z-index:4;
+}
+.bn{display:flex;flex-direction:column;align-items:center;gap:3px;color:rgba(255,251,240,.55);font-size:10px;font-family:'JetBrains Mono',monospace;letter-spacing:.06em;cursor:pointer;width:56px}
+.bn svg{width:19px;height:19px}
+.bn.on{color:var(--paper)}
+.bn.on svg{stroke:var(--wood)}
+/* BROWSER */
+.brw{height:100%;display:flex;flex-direction:column;background:var(--paper);position:relative;z-index:2}
+.appbar{padding:14px 18px 10px;flex:none;display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--line2)}
+.crumb{font-size:15px;font-weight:700;flex:1;color:var(--ink)}
+.crumb span{color:var(--muted);font-weight:400}
+.selbar{
+  margin:10px 16px 10px;flex:none;display:flex;align-items:center;gap:4px;
+  background:var(--ink);border-radius:14px;padding:6px 8px;color:var(--paper);
+}
+.selbar .count{
+  font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--wood);padding:0 10px 0 6px;
+}
+.selbar .act{flex:1;display:flex;justify-content:space-around}
+.selbar .abtn{color:rgba(255,251,240,.85);display:grid;place-items:center;width:36px;height:32px;border-radius:9px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px}
+.selbar .abtn:hover{background:rgba(255,255,255,.08)}
+.selbar .abtn.danger{color:#FF9B8A}
+.tile-grid{flex:1;padding:4px 16px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-content:start;position:relative;z-index:2}
+.tile{
+  border-radius:16px;border:1px solid var(--line);overflow:hidden;cursor:pointer;
+  background:var(--key);transition:.15s;position:relative;
+  box-shadow:0 2px 10px -8px rgba(28,27,25,.14);
+}
+.tile.sel{border-color:var(--teal2);box-shadow:0 0 0 1.5px var(--teal2), 0 6px 18px -10px rgba(30,78,63,.2)}
+.thumb{aspect-ratio:1.08;display:grid;place-items:center;position:relative}
+.thumb.doc{background:linear-gradient(145deg,#E8EEF6,#DDE6F2);color:#4A6FA5}
+.thumb.img{background:linear-gradient(145deg,#E6F0EB,#D6E6DE);color:#2A6B5A}
+.thumb.arc{background:linear-gradient(145deg,#F5E8C8,#EDE0B8);color:#8A6A2A}
+.thumb.code{background:linear-gradient(145deg,#EDE2F0,#DDD0E6);color:#6B4A7A}
+.thumb svg{width:26px;height:26px}
+.check{
+  position:absolute;top:8px;right:8px;width:20px;height:20px;border-radius:50%;
+  border:1.5px solid rgba(28,27,25,.25);display:grid;place-items:center;background:rgba(255,255,255,.85);
+}
+.check.on{background:var(--teal2);border-color:var(--teal2);color:var(--paper)}
+.tname{padding:9px 10px 10px;font-size:12px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink);font-weight:500;border-top:1px solid var(--line2);background:var(--paper)}
+.fab{
+  position:absolute;bottom:26px;right:22px;height:52px;padding:0 22px;border-radius:18px;
+  background:var(--ink);color:var(--paper);font-weight:700;font-size:14px;
+  display:flex;align-items:center;gap:8px;box-shadow:0 14px 30px -10px rgba(28,27,25,.35);
+  cursor:pointer;z-index:6;border:1px solid rgba(255,255,255,.06);
+}
+/* EDITOR */
+.ed{height:100%;display:flex;flex-direction:column;background:var(--paper);position:relative;z-index:2}
+.ed-bar{padding:12px 14px 10px;flex:none;display:flex;align-items:center;gap:2px;border-bottom:1px solid var(--line2);background:var(--key)}
+.ed-title{flex:1;min-width:0;padding:0 8px}
+.ed-title .fn{font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--ink);font-weight:500}
+.ed-title .st{font-family:'DM Sans',sans-serif;font-size:11px;color:var(--faint);margin-top:2px}
+.ed-title .dirty{color:var(--vermillion)}
+.ed-body{flex:1;display:flex;min-height:0;position:relative}
+.gutter{
+  flex:none;width:44px;padding:14px 0;text-align:right;
+  font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.75;
+  color:rgba(28,27,25,.22);border-right:1px solid var(--line2);
+  background:var(--paper2);
+}
+.gutter div{padding-right:10px}
+.gutter div.cur{color:var(--vermillion);background:rgba(214,64,42,.08);font-weight:500}
+.code{
+  flex:1;padding:14px 14px;font-family:'JetBrains Mono',monospace;font-size:12.5px;
+  line-height:1.75;white-space:pre;overflow:hidden;color:#2B2B2A;
+}
+.code .kw{color:#6B4A7A}.code .fn{color:#4A6FA5}.code .str{color:#2A6B5A}.code .cm{color:#B8B2A6;font-style:italic}
+.code .curline{background:rgba(214,64,42,.06);margin:0 -14px;padding:0 14px;display:inline-block;width:calc(100% + 28px);border-left:2px solid var(--vermillion)}
+.ed-status{
+  flex:none;display:flex;gap:8px;padding:9px 16px 24px;
+  font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--faint);
+  border-top:1px solid var(--line2);background:var(--key);
+}
+.ed-status .chip2{border:1px solid var(--line);border-radius:999px;padding:4px 10px;background:var(--paper)}
+.ed-status .chip2.on{color:var(--teal2);border-color:rgba(30,78,63,.18);background:var(--sage-light)}
+/* SETTINGS */
+.set{height:100%;display:flex;flex-direction:column;background:var(--paper2);position:relative;z-index:2}
+.set-body{flex:1;overflow:hidden;padding:6px 18px 20px}
+.group{margin-bottom:16px}
+.group>.sec-label{margin-bottom:8px;color:var(--muted)}
+.card{border:1px solid var(--line);border-radius:16px;background:var(--key);overflow:hidden;box-shadow:0 2px 12px -8px rgba(28,27,25,.12)}
+.srow{
+  display:flex;align-items:center;gap:12px;padding:13px 15px;
+  border-top:1px solid var(--line2);font-size:14px;
+}
+.srow:first-child{border-top:none}
+.srow .lbl{flex:1;font-weight:500;color:var(--ink)}
+.srow .hint{font-size:11.5px;color:var(--faint);margin-top:2px;font-weight:400}
+.toggle{
+  width:42px;height:24px;border-radius:12px;background:var(--paper2);
+  border:1px solid var(--line);position:relative;flex:none;cursor:pointer;
+}
+.toggle::after{
+  content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;
+  background:var(--faint);transition:.2s;
+}
+.toggle.on{background:var(--teal2);border-color:var(--teal2)}
+.toggle.on::after{left:21px;background:var(--paper)}
+.accent-dots{display:flex;gap:9px}
+.adot{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid var(--paper);box-shadow:0 0 0 1px var(--line)}
+.adot.on{box-shadow:0 0 0 2px var(--ink)}
+.warnbox{
+  margin:8px 0 0;padding:11px 12px;border-radius:12px;
+  background:#FFF1EF;border:1px solid rgba(214,64,42,.18);
+  color:#8A3A2E;font-size:12px;line-height:1.6;
+}
+</style>
+</head>
+<body>
+
+<header class="board-head">
+  <h1>Kalku<br><em>v2 — Atelier Paper</em></h1>
+  <p class="sub"><b>Terang, hangat, editorial.</b> Kebalikan total dari v1 (dark graphite). Kalkulator terasa seperti alat tulis premium di atas kertas — tombol putih timbul, display tinta pekat, satu aksen vermillion hanya untuk <b>=</b>. Vault membuka nuansa arsip kertas + felt sage — terang tapi tetap privat, bukan pindah aplikasi.</p>
+  <div class="swatches">
+    <div class="sw" style="background:#FFFBF0"><span>paper</span></div>
+    <div class="sw" style="background:#1C1B19"><span>ink</span></div>
+    <div class="sw" style="background:#D6402A"><span>vermillion</span></div>
+    <div class="sw" style="background:#1E4E3F"><span>teal</span></div>
+    <div class="sw" style="background:#EDE8DC"><span>board</span></div>
+    <div class="sw" style="background:#E6F0EB;border-color:#C8D9D1"><span>sage</span></div>
+  </div>
+</header>
+
+<main class="frames">
+
+<!-- CALC BASIC -->
+<div class="frame-wrap">
+  <div class="phone"><div class="screen"><div class="notch"></div>
+    <div class="statusbar"><span>21:47</span><span>LTE ▮▮▮</span></div>
+    <div class="calc">
+      <div class="calc-top">
+        <div class="chip">DEG</div>
+        <div style="flex:1"></div>
+        <div class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 8v4l2.5 2.5"/><circle cx="12" cy="12" r="9"/></svg></div>
+        <div class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="3" width="8" height="18" rx="2"/><path d="M12 18h.01"/></svg></div>
+      </div>
+      <div class="calc-display">
+        <div class="expr">12 + 7 × 3 − 4</div>
+        <div class="result">29</div>
+        <div class="preview">history · 128 × 4 = 512</div>
+      </div>
+      <div class="pad">
+        <div class="key clear">C</div>
+        <div class="key util">(</div>
+        <div class="key util">)</div>
+        <div class="key op">÷</div>
+        <div class="key">7</div><div class="key">8</div><div class="key">9</div>
+        <div class="key op">×</div>
+        <div class="key">4</div><div class="key">5</div><div class="key">6</div>
+        <div class="key op">−</div>
+        <div class="key">1</div><div class="key">2</div><div class="key">3</div>
+        <div class="key op">+</div>
+        <div class="key util">⌫</div>
+        <div class="key">0</div>
+        <div class="key util">·</div>
+        <div class="key eq">=</div>
+      </div>
+    </div>
+  </div><div class="homebar"></div></div>
+  <div class="frame-label"><b>CALCULATOR</b> · BASIC</div>
+  <p class="frame-note">Kertas hangat, tombol putih timbul dengan bayangan halus. <b>Hanya `=` yang vermillion</b> — hierarki jelas, tidak norak. Operator pakai sage-light tipis, bukan blok warna.</p>
+</div>
+
+<!-- CALC SCI -->
+<div class="frame-wrap">
+  <div class="phone"><div class="screen"><div class="notch"></div>
+    <div class="statusbar"><span>21:47</span><span>LTE ▮▮▮</span></div>
+    <div class="calc">
+      <div class="calc-top">
+        <div class="seg"><i class="on">DEG</i><i>RAD</i></div>
+        <div style="flex:1"></div>
+        <div class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 8v4l2.5 2.5"/><circle cx="12" cy="12" r="9"/></svg></div>
+        <div class="iconbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h16M7 16l10-10M14 6h3v3" /></svg></div>
+      </div>
+      <div class="calc-display">
+        <div class="expr">√(144) + sin(30) × π</div>
+        <div class="result">13.571</div>
+        <div class="preview">= 12 + 0.5π</div>
+      </div>
+      <div class="sci-pad">
+        <div class="sci-key">sin</div><div class="sci-key">cos</div><div class="sci-key">tan</div>
+        <div class="sci-key">ln</div><div class="sci-key">log</div><div class="sci-key">√(</div>
+        <div class="sci-key">asin</div><div class="sci-key">acos</div><div class="sci-key">atan</div>
+        <div class="sci-key">exp</div><div class="sci-key">%</div><div class="sci-key">!</div>
+      </div>
+      <div class="pad" style="padding-top:8px">
+        <div class="key clear">C</div>
+        <div class="key util">(</div>
+        <div class="key util">)</div>
+        <div class="key op">÷</div>
+        <div class="key">7</div><div class="key">8</div><div class="key">9</div>
+        <div class="key op">×</div>
+        <div class="key">4</div><div class="key">5</div><div class="key">6</div>
+        <div class="key op">−</div>
+        <div class="key">1</div><div class="key">2</div><div class="key">3</div>
+        <div class="key op">+</div>
+        <div class="key util">π</div>
+        <div class="key">0</div>
+        <div class="key util">^</div>
+        <div class="key eq">=</div>
+      </div>
+    </div>
+  </div><div class="homebar"></div></div>
+  <div class="frame-label"><b>CALCULATOR</b> · SCIENTIFIC</div>
+  <p class="frame-note">Strip ilmiah <b>putih tipis</b> (bukan gelap) — tetap ringan. DEG/RAD jadi pill hitam-putih, bukan chip tembaga. Konsisten dengan bahasa kertas.</p>
+</div>
+
+<!-- VAULT DASHBOARD -->
+<div class="frame-wrap">
+  <div class="phone"><div class="screen"><div class="notch"></div>
+    <div class="statusbar"><span>21:48</span><span>LTE ▮▮▮</span></div>
+    <div class="vault">
+      <div class="vault-head">
+        <h2>Vault <em>privat</em></h2>
+        <div class="spacer"></div>
+        <div class="pill-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></div>
+        <div class="pill-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1 1.55V21a2 2 0 11-4 0v-.09a1.7 1.7 0 00-1-1.55 1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-1.55-1H3a2 2 0 110-4h.09a1.7 1.7 0 001.55-1 1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06A1.7 1.7 0 009 4.6a1.7 1.7 0 001-1.55V3a2 2 0 114 0v.09a1.7 1.7 0 001 1.55 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06A1.7 1.7 0 0021.4 9c.26.61.85 1 1.51 1"/></svg></div>
+      </div>
+      <div class="searchbar">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+        Cari file, folder, tag…
+      </div>
+      <div class="storage-card">
+        <div class="row1"><span class="t">Storage terpakai</span><span class="v">12.4 GB</span></div>
+        <div class="bar-row"><span class="n">Photos</span><div class="b"><i style="width:78%;background:var(--teal2)"></i></div><span class="s">8.1 GB</span></div>
+        <div class="bar-row"><span class="n">Videos</span><div class="b"><i style="width:46%;background:#5A8AC0"></i></div><span class="s">2.4 GB</span></div>
+        <div class="bar-row"><span class="n">Documents</span><div class="b"><i style="width:22%;background:var(--wood)"></i></div><span class="s">1.2 GB</span></div>
+        <div class="bar-row"><span class="n">Code</span><div class="b"><i style="width:9%;background:#8E6BB0"></i></div><span class="s">80 MB</span></div>
+      </div>
+      <div class="cats">
+        <div class="sec-label">Categories</div>
+        <div class="cat-grid">
+          <div class="cat"><div class="g" style="background:var(--sage-light);color:var(--teal2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg></div><div class="nm">Photos</div><div class="ct">214 file</div></div>
+          <div class="cat"><div class="g" style="background:#E3ECF6;color:#4A6FA5"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3"/></svg></div><div class="nm">Videos</div><div class="ct">37 file</div></div>
+          <div class="cat"><div class="g" style="background:#F5E8C8;color:#8A6A2A"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div><div class="nm">Audio</div><div class="ct">96 file</div></div>
+          <div class="cat"><div class="g" style="background:#F0E8EE;color:#6B4A7A"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></div><div class="nm">Docs</div><div class="ct">58 file</div></div>
+          <div class="cat"><div class="g" style="background:#EDE2F0;color:#8E6BB0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg></div><div class="nm">Code</div><div class="ct">142 file</div></div>
+          <div class="cat"><div class="g" style="background:#FFF1EF;color:var(--vermillion)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg></div><div class="nm">Archives</div><div class="ct">12 file</div></div>
+        </div>
+      </div>
+      <div class="recent">
+        <div class="sec-label">Recent</div>
+        <div class="frow"><div class="glyph" style="background:var(--sage-light);color:var(--teal2);border-color:var(--line)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg></div><div class="meta"><div class="fn">liburan_bali.jpg</div><div class="fs">2.4 MB · 10 mnt lalu</div></div></div>
+        <div class="frow"><div class="glyph" style="background:#EDE2F0;color:#6B4A7A;border-color:var(--line)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg></div><div class="meta"><div class="fn">main.dart</div><div class="fs">8 KB · 1 jam lalu</div></div></div>
+        <div class="frow"><div class="glyph" style="background:var(--paper2);color:var(--ink);border-color:var(--line)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></div><div class="meta"><div class="fn">tugas_kelompok.pdf</div><div class="fs">1.1 MB · kemarin</div></div></div>
+      </div>
+      <div class="bottomnav">
+        <div class="bn on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 10l9-7 9 7v10a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>HOME</div>
+        <div class="bn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>BROWSE</div>
+        <div class="bn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>GALERI</div>
+        <div class="bn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>SAMPAH</div>
+      </div>
+    </div>
+  </div><div class="homebar"></div></div>
+  <div class="frame-label"><b>VAULT</b> · DASHBOARD · PAPER</div>
+  <p class="frame-note">Putih-kertas dominan, bar teal pekat, card berbayang halus. <b>Bottom nav hitam</b> jadi jangkar visual — kontras dengan terang di atas, terasa seperti laci arsip.</p>
+</div>
+
+<!-- BROWSER -->
+<div class="frame-wrap">
+  <div class="phone"><div class="screen"><div class="notch"></div>
+    <div class="statusbar"><span>21:49</span><span>LTE ▮▮▮</span></div>
+    <div class="brw">
+      <div class="appbar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        <div class="crumb">Photos <span>/ 2026</span></div>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><path d="M13 13h8v8h-8z" opacity=".35"/></svg>
+        <svg style="margin-left:10px" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8"><path d="M3 6h18M7 12h10M11 18h2"/></svg>
+      </div>
+      <div class="selbar">
+        <span class="count">2 dipilih</span>
+        <div class="act">
+          <div class="abtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></div>
+          <div class="abtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></div>
+          <div class="abtn">ZIP</div>
+          <div class="abtn danger"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></div>
+          <div class="abtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6L6 18M6 6l12 12"/></svg></div>
+        </div>
+      </div>
+      <div class="tile-grid">
+        <div class="tile sel"><div class="thumb img"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg><div class="check on"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4"><path d="M20 6L9 17l-5-5"/></svg></div></div><div class="tname">pantai_01.jpg</div></div>
+        <div class="tile"><div class="thumb img"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg></div><div class="tname">gunung.jpg</div></div>
+        <div class="tile sel"><div class="thumb img"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg><div class="check on"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4"><path d="M20 6L9 17l-5-5"/></svg></div></div><div class="tname">sunset.png</div></div>
+        <div class="tile"><div class="thumb doc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></div><div class="tname">catatan.txt</div></div>
+        <div class="tile"><div class="thumb arc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg></div><div class="tname">backup.zip</div></div>
+        <div class="tile"><div class="thumb code"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg></div><div class="tname">widget.kt</div></div>
+        <div class="tile"><div class="thumb img"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg></div><div class="tname">danau.jpg</div></div>
+        <div class="tile"><div class="thumb doc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></div><div class="tname">resep.csv</div></div>
+        <div class="tile"><div class="thumb arc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg></div><div class="tname">proyek.tar.gz</div></div>
+      </div>
+      <button class="fab">+ Import</button>
+    </div>
+  </div><div class="homebar"></div></div>
+  <div class="frame-label"><b>BROWSER</b> · GRID + MULTI-SELECT</div>
+  <p class="frame-note">Tile putih-kertas dengan header kategori <b>pastel</b> (berbeda tiap jenis). Pilihan aktif: border teal + shadow, bukan tembaga — konsisten dengan bahasa vault terang.</p>
+</div>
+
+<!-- EDITOR -->
+<div class="frame-wrap">
+  <div class="phone"><div class="screen"><div class="notch"></div>
+    <div class="statusbar"><span>21:51</span><span>LTE ▮▮▮</span></div>
+    <div class="ed">
+      <div class="ed-bar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        <div class="ed-title">
+          <div class="fn">main.dart <span class="dirty">•</span></div>
+          <div class="st">Documents / flutter · disimpan 21:50</div>
+        </div>
+        <div class="iconbtn" style="color:var(--muted)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14L4 9l5-5M20 9H4M15 10l5 5-5 5M4 15h16" transform="scale(.85) translate(2 2)"/></svg></div>
+        <div class="iconbtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></div>
+        <div class="iconbtn" style="color:var(--teal2);border-color:rgba(30,78,63,.14);background:var(--sage-light)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg></div>
+      </div>
+      <div class="ed-body">
+        <div class="gutter">
+          <div>1</div><div>2</div><div>3</div><div class="cur">4</div><div>5</div><div>6</div>
+          <div>7</div><div>8</div><div>9</div><div>10</div><div>11</div><div>12</div>
+        </div>
+        <div class="code"><span class="kw">import</span> 'package:flutter/material.dart';
+
+<span class="kw">void</span> <span class="fn">main</span>() {
+  <span class="fn">runApp</span>(<span class="kw">const</span> KalkuApp());
+}
+
+<span class="cm">// vault entry — tetap di balik lock</span>
+<span class="kw">class</span> <span class="fn">KalkuApp</span> <span class="kw">extends</span> StatelessWidget {
+  <span class="kw">@override</span>
+  Widget <span class="fn">build</span>(ctx) {
+    <span class="kw">return</span> <span class="str">'…'</span>;
+  }</div>
+      </div>
+      <div class="ed-status">
+        <span class="chip2 on">MONO 14</span>
+        <span class="chip2">WRAP</span>
+        <span class="chip2">#</span>
+        <span style="flex:1"></span>
+        <span>23 baris · 214 kata</span>
+      </div>
+    </div>
+  </div><div class="homebar"></div></div>
+  <div class="frame-label"><b>EDITOR</b> · TEKS &amp; KODE</div>
+  <p class="frame-note">Kertas + tinta, syntax tint <b>sangat lembut</b> (tidak neon). Garis aktif: border vermillion tipis + wash merah muda pucat — cukup terlihat, tidak berisik.</p>
+</div>
+
+<!-- SETTINGS -->
+<div class="frame-wrap">
+  <div class="phone"><div class="screen"><div class="notch"></div>
+    <div class="statusbar"><span>21:53</span><span>LTE ▮▮▮</span></div>
+    <div class="set">
+      <div class="appbar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        <div class="crumb">Pengaturan</div>
+      </div>
+      <div class="set-body">
+        <div class="group">
+          <div class="sec-label">Tampilan</div>
+          <div class="card">
+            <div class="srow"><span class="lbl">Tema</span>
+              <div class="seg"><i>Sistem</i><i>Terang</i><i class="on">Gelap</i></div>
+            </div>
+            <div class="srow"><span class="lbl">Warna aksen</span>
+              <div class="accent-dots">
+                <div class="adot on" style="background:#D6402A"></div>
+                <div class="adot" style="background:#1565C0"></div>
+                <div class="adot" style="background:#3949AB"></div>
+                <div class="adot" style="background:#2A6B5A"></div>
+                <div class="adot" style="background:#8E6BB0"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="group">
+          <div class="sec-label">Keamanan</div>
+          <div class="card">
+            <div class="srow"><span class="lbl">Ganti PIN</span><span style="color:var(--faint)">›</span></div>
+            <div class="srow"><span class="lbl">Auto-lock<span class="hint">Kunci vault otomatis</span></span>
+              <div class="seg"><i>Off</i><i>1m</i><i class="on">5m</i><i>15m</i></div>
+            </div>
+            <div class="srow"><span class="lbl">Biometrik<span class="hint">Sidik jari</span></span><div class="toggle"></div></div>
+          </div>
+        </div>
+        <div class="group">
+          <div class="sec-label">Vault</div>
+          <div class="card">
+            <div class="srow"><span class="lbl">Lokasi<span class="hint" style="font-family:'JetBrains Mono',monospace;font-size:10px">/storage/emulated/0/.KalkuVault</span></span></div>
+          </div>
+          <div class="warnbox">⚠ Fallback privat aktif — beri izin <b>All files access</b> agar file bertahan setelah uninstall.</div>
+          <div class="card">
+            <div class="srow"><span class="lbl">Rebuild index<span class="hint">Scan & bangun ulang metadata</span></span><span style="color:var(--faint)">›</span></div>
+            <div class="srow"><span class="lbl">Recycle bin auto-clean</span>
+              <div class="seg"><i>Off</i><i class="on">30h</i><i>60h</i></div>
+            </div>
+          </div>
+        </div>
+        <div class="group">
+          <div class="sec-label">Editor</div>
+          <div class="card">
+            <div class="srow"><span class="lbl">Font size</span><span class="chip" style="font-size:11px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);font-family:'JetBrains Mono',monospace;color:var(--muted)">− &nbsp;14&nbsp; +</span></div>
+            <div class="srow"><span class="lbl">Word wrap</span><div class="toggle on"></div></div>
+            <div class="srow"><span class="lbl">Line numbers</span><div class="toggle on"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div><div class="homebar"></div></div>
+  <div class="frame-label"><b>SETTINGS</b> · TERKELOMPOK</div>
+  <p class="frame-note">Kartu putih di atas <b>latar kertas #F3EDE0</b>. Segmented hitam-putih, toggle teal saat on. Warning box merah muda pucat — jujur tapi tidak agresif.</p>
+</div>
+
+</main>
+<footer style="padding:0 48px 80px;color:var(--faint);font-size:13px;line-height:1.7;max-width:900px">
+  <p><b style="color:var(--muted)">v2 vs v1:</b> v1 (Precision Archive) dark graphite + tembaga — dramatis, premium. <b>v2 (Atelier Paper)</b> terang kertas hangat + vermillion + teal — editorial, ramah siang hari, tombol terasa seperti alat tulis. Pilih yang paling kamu suka, atau mix (mis. kalkulator terang + vault gelap juga bisa). Beri tahu: "v1 / v2 / mix / revisi lagi".</p>
+</footer>
+</body>
+</html>
