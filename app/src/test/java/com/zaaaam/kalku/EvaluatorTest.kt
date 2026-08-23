@@ -63,7 +63,7 @@ class EvaluatorTest {
     @Test fun functions() {
         assertEquals(2.0, value("sqrt(4)"), 1e-12)
         assertEquals(3.0, value("log(10^3)"), 1e-9)
-        assertEquals(Math.E, value("ln(e)"), 1e-12)
+        assertEquals(1.0, value("ln(e)"), 1e-12)
         assertEquals(1.0, value("sin(90)"), 1e-12)
         assertEquals(0.0, value("cos(90)"), 1e-12)
         assertEquals(45.0, value("asin(sqrt(2)/2)"), 1e-9)

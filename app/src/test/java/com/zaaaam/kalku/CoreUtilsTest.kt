@@ -77,7 +77,7 @@ class NamesFormatTest {
         assertEquals("photo (2).jpg", Names.uniqueName("photo.jpg", taken))
         assertEquals("photo (3).jpg", Names.uniqueName("photo.jpg", taken + "photo (2).jpg"))
         assertEquals("new.png", Names.uniqueName("new.png", setOf("other.png")))
-        assertEquals("archive (2)", Names.uniqueName("archive", taken))
+        assertEquals("archive (2)", Names.uniqueName("archive", taken + "archive"))
     }
 
     @Test fun byteFormatting() {
