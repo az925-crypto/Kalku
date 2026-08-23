@@ -92,7 +92,7 @@ fun CalculatorScreen(
                 clipboard.setText(AnnotatedString(vm.expression.ifBlank { "0" }))
             }) { Icon(Icons.Default.ContentCopy, contentDescription = "Copy") }
             IconButton(onClick = {
-                clipboard.getText()?.text?.let { vm.setExpression(it.take(200)) }
+                clipboard.getText()?.text?.let { vm.replaceExpression(it.take(200)) }
             }) { Icon(Icons.Default.ContentPaste, contentDescription = "Paste") }
             IconButton(onClick = { sciMode = !sciMode }) {
                 Icon(
@@ -203,7 +203,7 @@ fun CalculatorScreen(
             HistorySheet(
                 items = history,
                 onPick = { item ->
-                    vm.setExpression(item.expression)
+                    vm.replaceExpression(item.expression)
                     showHistory = false
                 },
                 onClear = {
@@ -230,7 +230,7 @@ private fun toggleSign(vm: CalcViewModel) {
     } else {
         expr.replaceRange(start, start + num.length, "(-$num)")
     }
-    vm.setExpression(updated)
+    vm.replaceExpression(updated)
 }
 
 @Composable

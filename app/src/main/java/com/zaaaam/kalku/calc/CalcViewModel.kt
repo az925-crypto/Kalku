@@ -124,7 +124,7 @@ class CalcViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Replaces the working expression, e.g. from history tap. */
-    fun setExpression(text: String) {
+    fun replaceExpression(text: String) {
         expression = text
         justEvaluated = false
     }
