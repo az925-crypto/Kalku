@@ -2,6 +2,7 @@ package com.zaaaam.kalku.viewer
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -119,7 +120,7 @@ fun TextEditorScreen(
         dirty = false
     }
 
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().statusBarsPadding()) {
         TopAppBar(
             title = {
                 Column {

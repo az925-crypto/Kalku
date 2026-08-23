@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -78,6 +80,8 @@ fun CalculatorScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
+            .navigationBarsPadding()
             .padding(horizontal = 14.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -178,35 +182,33 @@ fun CalculatorScreen(
 
         data class Pad(val label: String, val role: KeyRole, val token: String? = null)
 
-        val lastRow = listOf(
-            Pad("+/-", KeyRole.UTIL), Pad("0", KeyRole.DIGIT, "0"),
-            Pad(".", KeyRole.UTIL, "."), Pad("=", KeyRole.EQUALS),
-        )
+        // Sesuai HTML: 5 baris tetap [C () ÷] / [789×] / [456−] / [123+] / [⌫ 0 · =]
         val rows = listOf(
             listOf(Pad("C", KeyRole.CLEAR), Pad("(", KeyRole.UTIL, "("), Pad(")", KeyRole.UTIL, ")"), Pad("÷", KeyRole.OP, "/")),
             listOf(Pad("7", KeyRole.DIGIT, "7"), Pad("8", KeyRole.DIGIT, "8"), Pad("9", KeyRole.DIGIT, "9"), Pad("×", KeyRole.OP, "*")),
             listOf(Pad("4", KeyRole.DIGIT, "4"), Pad("5", KeyRole.DIGIT, "5"), Pad("6", KeyRole.DIGIT, "6"), Pad("−", KeyRole.OP, "-")),
             listOf(Pad("1", KeyRole.DIGIT, "1"), Pad("2", KeyRole.DIGIT, "2"), Pad("3", KeyRole.DIGIT, "3"), Pad("+", KeyRole.OP, "+")),
+            listOf(Pad("⌫", KeyRole.UTIL), Pad("0", KeyRole.DIGIT, "0"), Pad("·", KeyRole.UTIL, "."), Pad("=", KeyRole.EQUALS)),
         )
 
         rows.forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { pad ->
-                    CalcKey(role = pad.role, modifier = Modifier.weight(1f).height(58.dp), label = pad.label) {
-                        when (pad.label) {
-                            "C" -> vm.clearAll()
-                            "+/-" -> toggleSign(vm)
-                            "=" -> vm.onEquals()
-                            else -> vm.append(pad.token ?: pad.label)
+                    if (pad.label == "⌫") {
+                        CalcKey("", KeyRole.UTIL, Modifier.weight(1f).height(58.dp), icon = Icons.AutoMirrored.Filled.Backspace, iconDesc = "Backspace") {
+                            vm.backspace(); tap()
                         }
-                        if (pad.label != "=") tap()
+                    } else {
+                        CalcKey(role = pad.role, modifier = Modifier.weight(1f).height(58.dp), label = pad.label) {
+                            when (pad.label) {
+                                "C" -> vm.clearAll()
+                                "=" -> vm.onEquals()
+                                else -> vm.append(pad.token ?: pad.label)
+                            }
+                            if (pad.label != "=") tap() else tap()
+                        }
                     }
                 }
-            }
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CalcKey("", KeyRole.UTIL, Modifier.weight(1f).height(46.dp), icon = Icons.AutoMirrored.Filled.Backspace, iconDesc = "Backspace") {
-                vm.backspace(); tap()
             }
         }
     }

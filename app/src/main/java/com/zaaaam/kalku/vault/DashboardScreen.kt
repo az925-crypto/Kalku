@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -86,7 +87,7 @@ fun DashboardScreen(
     ) {
         item {
             Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(start = 20.dp, end = 14.dp, top = 14.dp, bottom = 4.dp)) {
+                Column(Modifier.statusBarsPadding().padding(start = 20.dp, end = 14.dp, top = 14.dp, bottom = 4.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         androidx.compose.foundation.text.BasicText(
                             buildAnnotatedString {
