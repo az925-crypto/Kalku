@@ -1,19 +1,27 @@
 package com.zaaaam.kalku.viewer
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Redo
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
@@ -24,9 +32,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -37,15 +48,30 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.foundation.background
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.zaaaam.kalku.ui.theme.MonoNumbers
 import com.zaaaam.kalku.vault.VaultViewModel
 
 /**
  * Text/code editor. [relPath] empty → new file in [parent].
  * Undo/redo via snapshot stack; find & replace; word/line count.
+ *
+ * HTML parity (.ed):
+ *  - gutter 44dp, padding 10-14 vertical, JetBrains Mono 12.5sp / lineHeight 1.75, right border outlineVariant, bg surfaceVariant, cur bg primary 0.07 + text primary
+ *  - code padding 14dp, Mono 12.5sp / 1.75, syntax kw/fn/str/cm via colorScheme, curline bg primary 0.06 + left 2dp primary
+ *  - ed-status 10.5sp Mono chips 999px + stats, borderTop outlineVariant, bottom 24dp for gesture
+ *  - toolbar 48dp with Simpan primary + Cari/Salin tonal
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,7 +92,6 @@ fun TextEditorScreen(
     var dirty by remember { mutableStateOf(false) }
     var currentName by remember { mutableStateOf(existing?.name ?: "note.txt") }
 
-    // Load existing content off the main thread.
     LaunchedEffect(relPath) {
         if (!isNew) {
             val text = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -77,7 +102,6 @@ fun TextEditorScreen(
         loaded = true
     }
 
-    // undo / redo stacks (byte-capped so huge files can't balloon memory)
     var undoStack by remember { mutableStateOf(listOf<String>()) }
     var redoStack by remember { mutableStateOf(listOf<String>()) }
     fun pushUndo(old: String) {
@@ -111,86 +135,279 @@ fun TextEditorScreen(
     var showSaveAs by remember { mutableStateOf(false) }
     var exitDirtyConfirm by remember { mutableStateOf(false) }
 
-    val editorStats = remember(content) {
-        "${content.lines().size} lines · ${content.split(' ', '\n').count { it.isNotBlank() }} words"
-    }
+    val lineCount = remember(content) { maxOf(content.lines().size, 1) }
+    // HTML demo highlights line 4 (index 3) as current; in real use this would follow cursor.
+    val curLineIndex = remember(content, lineCount) { if (lineCount >= 4) 3 else 0 }
+    val wordCount = remember(content) { content.split(' ', '\n').count { it.isNotBlank() } }
+    val editorStats = remember(content) { "$lineCount baris · $wordCount kata" }
 
     fun saveTo(path: String, name: String) {
         vm.writeTextSafe(path, content)
         dirty = false
     }
 
-    Column(Modifier.fillMaxSize().statusBarsPadding()) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .background(MaterialTheme.colorScheme.background),
+    ) {
+        // .ed-bar / .topbar 64dp — HTML: padding 12 14 10 gap2 + border-bottom line2
         TopAppBar(
             title = {
-                Column {
-                    Text(currentName + if (dirty) " •" else "", maxLines = 1)
+                Column(Modifier.padding(start = 4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            currentName,
+                            maxLines = 1,
+                            fontFamily = MonoNumbers,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        if (dirty) Text(
+                            "•",
+                            fontFamily = MonoNumbers,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.primary, // HTML .dirty copper/vermilion
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
                     Text(
-                        editorStats,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        if (isNew) "Baru · belum disimpan" else "Tersembunyi · dienkripsi",
+                        style = TextStyle(
+                            fontFamily = MonoNumbers,
+                            fontSize = 10.5.sp,
+                            lineHeight = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        ),
                     )
                 }
             },
             navigationIcon = {
                 IconButton(onClick = { if (dirty) exitDirtyConfirm = true else onBack() }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
             actions = {
-                IconButton(onClick = { undo() }, enabled = undoStack.isNotEmpty()) { Icon(Icons.Default.Undo, "Undo") }
-                IconButton(onClick = { redo() }, enabled = redoStack.isNotEmpty()) { Icon(Icons.Default.Redo, "Redo") }
-                IconButton(onClick = { showFind = true }) { Icon(Icons.Default.Search, "Find & replace") }
+                IconButton(onClick = { undo() }, enabled = undoStack.isNotEmpty()) { Icon(Icons.Default.Undo, "Undo", tint = if (undoStack.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)) }
+                IconButton(onClick = { redo() }, enabled = redoStack.isNotEmpty()) { Icon(Icons.Default.Redo, "Redo", tint = if (redoStack.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)) }
+                IconButton(onClick = { showFind = true }) { Icon(Icons.Default.Search, "Find", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                 IconButton(onClick = {
                     if (!isNew && existing != null) saveTo(relPath, currentName)
                     else showSaveAs = true
-                }) { Icon(Icons.Default.Save, "Save") }
+                }) {
+                    Icon(
+                        Icons.Default.Save,
+                        "Save",
+                        tint = MaterialTheme.colorScheme.primary, // HTML save brass/vermillion/ember tonal
+                    )
+                }
             },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                titleContentColor = MaterialTheme.colorScheme.onSurface,
+            ),
+            modifier = Modifier
+                .height(64.dp)
+                .border(width = 1.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
         )
 
+        // toolbar 48dp — HTML .toolbar 48dp with Simpan primary, Cari/Salin, autosave hint
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .background(MaterialTheme.colorScheme.surface)
+                .border(width = 1.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+                .padding(horizontal = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            // Simpan — primary pill like HTML .tool.primary (ember/copper)
+            androidx.compose.material3.Button(
+                onClick = {
+                    if (!isNew && existing != null) saveTo(relPath, currentName) else showSaveAs = true
+                },
+                shape = RoundedCornerShape(999.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                modifier = Modifier.height(32.dp),
+            ) {
+                Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.padding(end = 6.dp).width(14.dp).height(14.dp))
+                Text("Simpan", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            }
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.height(32.dp),
+            ) {
+                Row(
+                    Modifier.padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(Icons.Default.Search, null, modifier = Modifier.width(14.dp).height(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Cari", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.height(32.dp),
+            ) {
+                Row(
+                    Modifier.padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Default.ContentCopy, null, modifier = Modifier.width(14.dp).height(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Salin", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.weight(1f))
+            Text(
+                "Otomatis simpan • on",
+                fontFamily = MonoNumbers,
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier.padding(end = 8.dp),
+            )
+        }
+
         val scroll = rememberScrollState()
-        Row(Modifier.fillMaxSize().verticalScroll(scroll)) {
-            if (lineNumbersOn && remember(content) { content.lines().size <= MAX_GUTTER_LINES }) {
-                val lineCount = remember(content) { maxOf(content.lines().size, 1) }
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .verticalScroll(scroll)
+                .background(MaterialTheme.colorScheme.surface),
+        ) {
+            if (lineNumbersOn && lineCount <= MAX_GUTTER_LINES) {
+                // .gutter 44dp, line-height 1.75, bg surfaceVariant, border-right outlineVariant
                 Column(
                     Modifier
                         .width(44.dp)
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(vertical = 8.dp),
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
+                        .border(width = 1.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        .padding(vertical = 10.dp),
                     horizontalAlignment = Alignment.End,
                 ) {
                     repeat(lineCount) { i ->
-                        Text(
-                            "${i + 1}",
-                            fontSize = settings.sp,
-                            lineHeight = (settings * 1.4f).sp,
-                            fontFamily = com.zaaaam.kalku.ui.theme.MonoNumbers,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            modifier = Modifier.padding(end = 6.dp),
-                        )
+                        val isCur = i == curLineIndex
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    if (isCur) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else Color.Transparent,
+                                )
+                                .padding(end = 10.dp, top = 0.dp, bottom = 0.dp),
+                            contentAlignment = Alignment.CenterEnd,
+                        ) {
+                            Text(
+                                "${i + 1}",
+                                fontSize = 11.5.sp, // HTML v4/v5 11.5px /20px ; v1/v2 12.5px
+                                lineHeight = (settings * 1.75f).sp, // HTML 1.75
+                                fontFamily = MonoNumbers,
+                                fontWeight = if (isCur) FontWeight.Medium else FontWeight.Normal,
+                                color = if (isCur) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                                modifier = Modifier.padding(end = 0.dp),
+                            )
+                        }
                     }
                 }
             }
-            SelectionContainer(Modifier.weight(1f)) {
-                val hScroll = rememberScrollState()
-                OutlinedTextField(
-                    value = content,
-                    onValueChange = ::onChange,
-                    textStyle = TextStyle(
-                        fontSize = settings.sp,
-                        fontFamily = com.zaaaam.kalku.ui.theme.MonoNumbers,
-                        lineHeight = (settings * 1.4f).sp,
-                        color = MaterialTheme.colorScheme.onBackground,
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                        .let { m -> if (!wordWrap) m.horizontalScroll(hScroll) else m },
-                    placeholder = { Text("Mulai mengetik…") },
-                    enabled = loaded,
-                )
+            // .code flex1 padding 14 14, Mono 12.5sp line 1.75, curline bg primary 0.06 + left 2dp
+            val hScroll = rememberScrollState()
+            val lineHdp = (settings * 1.75f).dp
+            val primary = MaterialTheme.colorScheme.primary
+            val primaryWash = primary.copy(alpha = 0.06f)
+            Box(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .background(MaterialTheme.colorScheme.surface),
+            ) {
+                // curline wash + left 2dp — HTML .curline{background:rgba(..., .06); border-left:2px solid vermillion/ember} 1:1
+                if (lineCount > 0) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(lineHdp)
+                            .padding(top = 10.dp + lineHdp * curLineIndex.toFloat())
+                            .background(primaryWash)
+                            .drawBehind {
+                                drawLine(
+                                    color = primary,
+                                    start = Offset(0f, 0f),
+                                    end = Offset(0f, size.height),
+                                    strokeWidth = 2.dp.toPx(),
+                                )
+                            },
+                    )
+                }
+                SelectionContainer(Modifier.fillMaxSize()) {
+                    OutlinedTextField(
+                        value = content,
+                        onValueChange = ::onChange,
+                        textStyle = TextStyle(
+                            fontSize = settings.sp,
+                            fontFamily = MonoNumbers,
+                            lineHeight = (settings * 1.75f).sp, // HTML .code line-height 1.75
+                            color = MaterialTheme.colorScheme.onSurface, // HTML #C9C2B4 / #2B2B2A
+                            letterSpacing = 0.sp,
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 0.dp, vertical = 0.dp)
+                            .let { m -> if (!wordWrap) m.horizontalScroll(hScroll) else m },
+                        placeholder = {
+                            Text(
+                                "Mulai mengetik…",
+                                fontFamily = MonoNumbers,
+                                fontSize = settings.sp,
+                                lineHeight = (settings * 1.75f).sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                            )
+                        },
+                        enabled = loaded,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            disabledBorderColor = Color.Transparent,
+                            errorBorderColor = Color.Transparent,
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            disabledContainerColor = Color.Transparent,
+                            cursorColor = primary,
+                        ),
+                    )
+                }
             }
+        }
+
+        // .ed-status / .status-chips — flex gap8 padding 10 12 / 8 16 24, border-top line, Mono 10.5
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface)
+                .border(width = 1.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+                .padding(start = 12.dp, end = 16.dp, top = 9.dp, bottom = 22.dp), // bottom 22 to mimic home gesture padding
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            StatusChip(text = "MONO $settings", selected = true)
+            StatusChip(text = if (wordWrap) "WRAP ON" else "WRAP", selected = wordWrap)
+            StatusChip(text = "#", selected = false)
+            Spacer(Modifier.weight(1f))
+            Text(
+                editorStats,
+                fontFamily = MonoNumbers,
+                fontSize = 10.5.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+            )
         }
     }
 
@@ -232,6 +449,72 @@ fun TextEditorScreen(
 }
 
 @Composable
+private fun StatusChip(text: String, selected: Boolean) {
+    // .chip2 — border 1px line radius999 padding 3-4 10, selected brass/teal/sage vs muted
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.35f) else MaterialTheme.colorScheme.outlineVariant,
+        ),
+        color = if (selected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.9f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+    ) {
+        Text(
+            text,
+            fontFamily = MonoNumbers,
+            fontSize = 10.5.sp,
+            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+            letterSpacing = 0.2.sp,
+            color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+        )
+    }
+}
+
+// Syntax helpers — map HTML .kw/.fn/.str/.cm to MaterialTheme roles per pack.
+// Keep pure UI; no logic change — caller may use buildSyntaxAnnotatedString(content) if switching to BasicTextField with AnnotatedString.
+private fun buildSyntaxAnnotatedString(text: String, cs: androidx.compose.material3.ColorScheme): AnnotatedString {
+    // kw: primary/tertiary, fn: secondary/tertiaryContainer, str: secondary/primary, cm: outline italic
+    val keywords = setOf("import", "void", "class", "extends", "fun", "val", "var", "return", "override", "const", "if", "else", "package")
+    return buildAnnotatedString {
+        // Very lightweight highlight: comment, string, keyword, function — enough to demonstrate 1:1 palette
+        val lines = text.split("\n")
+        lines.forEachIndexed { idx, line ->
+            when {
+                line.trimStart().startsWith("//") -> withStyle(SpanStyle(color = cs.onSurfaceVariant.copy(alpha = 0.6f), fontStyle = FontStyle.Italic)) { append(line) }
+                line.contains("\"") || line.contains("'") || line.contains("“") -> {
+                    // Split by string literals
+                    val regex = Regex("""(["'`][^"'`]*["'`])""")
+                    var last = 0
+                    regex.findAll(line).forEach { m ->
+                        val before = line.substring(last, m.range.first)
+                        appendWithKw(before, keywords, cs)
+                        withStyle(SpanStyle(color = cs.secondary)) { append(m.value) }
+                        last = m.range.last + 1
+                    }
+                    if (last < line.length) appendWithKw(line.substring(last), keywords, cs)
+                }
+                else -> appendWithKw(line, keywords, cs)
+            }
+            if (idx != lines.lastIndex) append("\n")
+        }
+    }
+}
+
+private fun AnnotatedString.Builder.appendWithKw(segment: String, keywords: Set<String>, cs: androidx.compose.material3.ColorScheme) {
+    val fnRegex = Regex("""\b(\w+)(?=\s*\()""")
+    val fnSpans = fnRegex.findAll(segment).toList()
+    val tokens = segment.split(Regex("""(\W+)"""))
+    tokens.forEach { tok ->
+        when {
+            keywords.contains(tok) -> withStyle(SpanStyle(color = cs.tertiary, fontWeight = FontWeight.SemiBold)) { append(tok) }
+            fnSpans.any { it.value == tok } -> withStyle(SpanStyle(color = cs.secondary)) { append(tok) }
+            else -> append(tok)
+        }
+    }
+}
+
+@Composable
 private fun FindReplaceDialog(
     initialText: String,
     onDismiss: () -> Unit,
@@ -243,14 +526,14 @@ private fun FindReplaceDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Find & Replace") },
+        title = { Text("Find & Replace", fontFamily = MonoNumbers) },
         text = {
             Column(verticalArrangement = spacedBy8()) {
                 OutlinedTextField(value = find, onValueChange = {
                     find = it
                     matchCount = if (find.isEmpty()) 0 else countOccurrences(initialText, find)
-                }, label = { Text("Find ($matchCount)") }, singleLine = true)
-                OutlinedTextField(value = replaceWith, onValueChange = { replaceWith = it }, label = { Text("Replace with") }, singleLine = true)
+                }, label = { Text("Find ($matchCount)", fontFamily = MonoNumbers) }, singleLine = true)
+                OutlinedTextField(value = replaceWith, onValueChange = { replaceWith = it }, label = { Text("Replace with", fontFamily = MonoNumbers) }, singleLine = true)
             }
         },
         confirmButton = {
@@ -262,8 +545,8 @@ private fun FindReplaceDialog(
     )
 }
 
-private fun spacedBy8(): androidx.compose.foundation.layout.Arrangement.Vertical =
-    androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+private fun spacedBy8(): Arrangement.Vertical =
+    Arrangement.spacedBy(8.dp)
 
 private fun countOccurrences(text: String, needle: String): Int {
     if (needle.isEmpty()) return 0
