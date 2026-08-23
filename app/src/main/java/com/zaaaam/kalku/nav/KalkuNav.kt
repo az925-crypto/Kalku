@@ -73,7 +73,7 @@ private object Routes {
 
 /** Cross-composable flag so first-entry PIN setup survives navigation. */
 internal object PinSetupPending {
-    val value = mutableStateOf(false)
+    var value by androidx.compose.runtime.mutableStateOf(false)
 }
 
 @Composable

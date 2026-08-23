@@ -9,6 +9,7 @@ import com.zaaaam.kalku.data.FileEntity
 import com.zaaaam.kalku.data.TrashEntity
 import kotlinx.coroutines.flow.first
 import java.io.File
+import java.util.UUID
 
 /** Recycle-bin, share/export, text I/O and index-rebuilding operations. */
 

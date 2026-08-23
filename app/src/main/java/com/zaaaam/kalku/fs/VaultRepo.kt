@@ -106,7 +106,7 @@ class VaultRepo(
     // ----------------------------------------------------------------- import
 
     suspend fun displayNameOf(uri: Uri): String {
-        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+        appContext.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
             if (c.moveToFirst()) {
                 val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                 if (idx >= 0) c.getString(idx)?.let { return it }
@@ -127,7 +127,7 @@ class VaultRepo(
                 val outFile = File(destDir, name)
                 val header = ByteArray(512)
                 var headerLen = 0
-                context.contentResolver.openInputStream(uri)?.use { input ->
+                appContext.contentResolver.openInputStream(uri)?.use { input ->
                     headerLen = input.read(header)
                     FileOutputStream(outFile).use { out ->
                         if (headerLen > 0) out.write(header, 0, headerLen)

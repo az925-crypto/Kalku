@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import com.zaaaam.kalku.fs.scan
 import java.io.File
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
