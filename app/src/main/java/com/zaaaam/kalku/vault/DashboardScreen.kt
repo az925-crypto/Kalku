@@ -33,6 +33,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -193,27 +195,27 @@ fun DashboardScreen(
             Spacer(Modifier.size(24.dp))
         }
     }
-    androidx.compose.material3.NavigationBar(
+    NavigationBar(
         containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        androidx.compose.material3.NavigationBarItem(
+        NavigationBarItem(
             selected = true, onClick = {},
             icon = { Icon(Icons.Filled.Home, null) },
             label = { Text("Home") },
         )
-        androidx.compose.material3.NavigationBarItem(
+        NavigationBarItem(
             selected = false, onClick = onBrowseRoot,
             icon = { Icon(Icons.AutoMirrored.Filled.List, null) },
             label = { Text("Browse") },
         )
-        androidx.compose.material3.NavigationBarItem(
+        NavigationBarItem(
             selected = false, onClick = onGallery,
             icon = { Icon(Icons.Default.Image, null) },
             label = { Text("Galeri") },
         )
-        androidx.compose.material3.NavigationBarItem(
+        NavigationBarItem(
             selected = false, onClick = onTrash,
             icon = { Icon(Icons.Default.DeleteOutline, null) },
             label = { Text("Sampah") },
