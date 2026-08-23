@@ -137,28 +137,28 @@ private fun precisionLight() = lightColorScheme(
 )
 
 private fun precisionDark() = darkColorScheme(
-    primary = Color(0xFFE09E45),            // copper
+    primary = Color(0xFFEC9C4A),            // copper — brighter, less muddy
     onPrimary = Color(0xFF241708),
-    primaryContainer = Color(0xFF2A251E),   // operator keys
-    onPrimaryContainer = Color(0xFFE09E45),
-    secondary = Color(0xFF9DB89A),          // vault sage
-    secondaryContainer = Color(0xFF17211B),
-    onSecondaryContainer = Color(0xFF9DB89A),
-    tertiary = Color(0xFFE09E45),
+    primaryContainer = Color(0xFF3A2E1F),   // operator keys — warmer
+    onPrimaryContainer = Color(0xFFFFDDB3),
+    secondary = Color(0xFFB8D0B8),          // vault sage — brighter
+    secondaryContainer = Color(0xFF1E2E24),
+    onSecondaryContainer = Color(0xFFC8E8C8),
+    tertiary = Color(0xFFEC9C4A),
     onTertiary = Color(0xFF241708),
-    tertiaryContainer = Color(0xFF3A2C18),
-    onTertiaryContainer = Color(0xFFEFB56A),
-    background = Color(0xFF12100E),
-    onBackground = Color(0xFFEDE6D8),
-    surface = Color(0xFF161B19),
-    onSurface = Color(0xFFEDE6D8),
-    surfaceVariant = Color(0xFF23201B),     // digit keys
-    onSurfaceVariant = Color(0xFF9A9082),
-    outline = Color(0xFF6B6355),
-    outlineVariant = Color(0xFF2C2822),
-    error = Color(0xFFE07B5A),
-    errorContainer = Color(0xFF33201A),
-    onErrorContainer = Color(0xFFE8A18B),
+    tertiaryContainer = Color(0xFF4A3420),
+    onTertiaryContainer = Color(0xFFFFDDB3),
+    background = Color(0xFF1C1917),         // lifted from #12100E
+    onBackground = Color(0xFFF0E6D0),
+    surface = Color(0xFF23201E),            // lifted
+    onSurface = Color(0xFFF0E6D0),
+    surfaceVariant = Color(0xFF2F2B25),     // digit keys — more contrast
+    onSurfaceVariant = Color(0xFFC2B8A8),
+    outline = Color(0xFF8A7F6E),
+    outlineVariant = Color(0xFF3A3530),
+    error = Color(0xFFFFB4A5),
+    errorContainer = Color(0xFF3D1F1A),
+    onErrorContainer = Color(0xFFFFDAD1),
 )
 
 private fun terraLight() = lightColorScheme(
@@ -186,27 +186,27 @@ private fun terraLight() = lightColorScheme(
 )
 
 private fun terraDark() = darkColorScheme(
-    primary = Color(0xFFFF5C33),            // ember nova
+    primary = Color(0xFFFF6B3D),            // ember nova — brighter
     onPrimary = Color(0xFF1C0D08),
-    primaryContainer = Color(0xFF3A2018),
-    onPrimaryContainer = Color(0xFFFFB39E),
-    secondary = Color(0xFFC7D8C1),
-    secondaryContainer = Color(0xFF27352E), // sage nocturne
-    onSecondaryContainer = Color(0xFFC7D8C1),
-    tertiary = Color(0xFF93B2DD),
-    tertiaryContainer = Color(0xFF22303F),
-    onTertiaryContainer = Color(0xFFB7CCE8),
-    background = Color(0xFF141815),         // obsidian night
-    onBackground = Color(0xFFF2EDE3),       // paper moon
-    surface = Color(0xFF1E2320),            // surface char
-    onSurface = Color(0xFFF2EDE3),
-    surfaceVariant = Color(0xFF252A27),
-    onSurfaceVariant = Color(0xFF9BA3A0),
-    outline = Color(0xFF6E7672),
-    outlineVariant = Color(0xFF2F3532),     // soot line
-    error = Color(0xFFFF7A5C),
-    errorContainer = Color(0xFF2B1E19),
-    onErrorContainer = Color(0xFFFFB39E),
+    primaryContainer = Color(0xFF4A2A1D),
+    onPrimaryContainer = Color(0xFFFFD8CC),
+    secondary = Color(0xFFD0E0C8),          // sage — brighter
+    secondaryContainer = Color(0xFF2E3F36), // sage nocturne — lifted
+    onSecondaryContainer = Color(0xFFD0E0C8),
+    tertiary = Color(0xFF9EC3E8),
+    tertiaryContainer = Color(0xFF2B3A4A),
+    onTertiaryContainer = Color(0xFFC2D8EF),
+    background = Color(0xFF1A1E1C),         // lifted from #141815
+    onBackground = Color(0xFFF5EDE0),       // paper moon — brighter
+    surface = Color(0xFF242926),            // surface char — lifted
+    onSurface = Color(0xFFF5EDE0),
+    surfaceVariant = Color(0xFF2F3530),
+    onSurfaceVariant = Color(0xFFB5BDB8),
+    outline = Color(0xFF8A948E),
+    outlineVariant = Color(0xFF3A4040),     // soot line — more visible
+    error = Color(0xFFFF8A6B),
+    errorContainer = Color(0xFF3A2520),
+    onErrorContainer = Color(0xFFFFD8CC),
 )
 
 // --------------------------------------------------------------- resolution

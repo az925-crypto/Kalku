@@ -120,15 +120,15 @@ fun CalculatorScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(0.88f)
-                .padding(top = 8.dp, bottom = 6.dp),
+                .weight(0.68f)
+                .padding(top = 6.dp, bottom = 4.dp),
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
                 text = vm.expression.ifBlank { "0" },
-                fontSize = 34.sp,
-                lineHeight = 42.sp,
+                fontSize = 38.sp,
+                lineHeight = 46.sp,
                 textAlign = TextAlign.End,
                 maxLines = 4,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -138,7 +138,7 @@ fun CalculatorScreen(
             if (pv.isNotEmpty() && pv != vm.expression) {
                 Text(
                     text = "= $pv",
-                    fontSize = 18.sp,
+                    fontSize = 19.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.End,
                     fontFamily = MonoNumbers,
@@ -149,14 +149,14 @@ fun CalculatorScreen(
             if (sciMode) {
             val sciKeys = listOf("sin(", "cos(", "tan(", "ln(", "log(", "sqrt(", "asin(", "acos(", "atan(", "exp(", "%", "!")
             sciKeys.chunked(6).forEach { row ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     row.forEach { key ->
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(36.dp)
+                                .height(40.dp)
                                 .clickable { vm.append(key); tap() },
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(11.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant,
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         ) {
@@ -167,7 +167,7 @@ fun CalculatorScreen(
                             ) {
                                 Text(
                                     key.removeSuffix("(").replace("sqrt", "√"),
-                                    fontSize = 11.5.sp,
+                                    fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontFamily = MonoNumbers,
                                 )
@@ -177,7 +177,7 @@ fun CalculatorScreen(
                     repeat(6 - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
-            Spacer(Modifier.height(2.dp))
+            Spacer(Modifier.height(4.dp))
         }
 
         data class Pad(val label: String, val role: KeyRole, val token: String? = null)
@@ -192,20 +192,20 @@ fun CalculatorScreen(
         )
 
         rows.forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 row.forEach { pad ->
                     if (pad.label == "⌫") {
-                        CalcKey("", KeyRole.UTIL, Modifier.weight(1f).height(58.dp), icon = Icons.AutoMirrored.Filled.Backspace, iconDesc = "Backspace") {
+                        CalcKey("", KeyRole.UTIL, Modifier.weight(1f).height(64.dp), icon = Icons.AutoMirrored.Filled.Backspace, iconDesc = "Backspace") {
                             vm.backspace(); tap()
                         }
                     } else {
-                        CalcKey(role = pad.role, modifier = Modifier.weight(1f).height(58.dp), label = pad.label) {
+                        CalcKey(role = pad.role, modifier = Modifier.weight(1f).height(64.dp), label = pad.label) {
                             when (pad.label) {
                                 "C" -> vm.clearAll()
                                 "=" -> vm.onEquals()
                                 else -> vm.append(pad.token ?: pad.label)
                             }
-                            if (pad.label != "=") tap() else tap()
+                            tap()
                         }
                     }
                 }
