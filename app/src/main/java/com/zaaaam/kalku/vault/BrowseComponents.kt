@@ -328,5 +328,5 @@ fun SnackHost(vm: VaultViewModel) {
             vm.dismissToast()
         }
     }
-    SnackbarHost(hostState = state)
+    androidx.compose.material3.SnackbarHost(hostState = state)
 }

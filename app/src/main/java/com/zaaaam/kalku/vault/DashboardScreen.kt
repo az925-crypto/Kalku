@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -132,7 +133,7 @@ fun DashboardScreen(
             SectionHeader("Categories")
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).size(height = ((stats.size + 2) / 3 * 84).dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(((stats.size + 2) / 3 * 84).dp),
                 userScrollEnabled = false,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),

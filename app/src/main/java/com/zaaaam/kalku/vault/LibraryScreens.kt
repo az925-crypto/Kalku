@@ -207,13 +207,13 @@ fun GalleryScreen(
         if (images.isEmpty()) {
             EmptyState("Belum ada gambar", Icons.Default.Image, Modifier.padding(padding).fillMaxSize())
         } else {
+            val indexedImages = remember(images) { images.withIndex().toList() }
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 110.dp),
                 modifier = Modifier.padding(padding).fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                val indexedImages = remember(images) { images.withIndex().toList() }
                 items(indexedImages, key = { it.value.id }) { (index, img) ->
                     // Coil resolves the File async and handles missing files gracefully;
                     // no per-item exists() stat on the main thread.
