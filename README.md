@@ -34,9 +34,12 @@ package: com.zaaaam.kalku | minSdk 26 | targetSdk 35
   (restore / hapus permanen / auto-clean), grid & list view, sort.
 - Deteksi tipe file via *magic bytes* + extension — file tanpa/salah extension
   tetap terkategori benar.
+- Enkripsi at-rest: semua file terenkripsi AES-256-GCM per-chunk. Dekripsi
+  dilakukan saat ditampilkan/saved — file tetap terenkripsi di disk.
+  Key derivation: PBKDF2-SHA256 dari PIN user.
 - Metadata (nama/path/tag/favorit/ukuran) ada di database Room; isi file tetap
-  di disk. **Settings → Rebuild index** membangun ulang index bila database
-  hilang/rusak.
+  di disk terenkripsi. **Settings → Rebuild index** membangun ulang index
+  bila database hilang/rusak.
 - Viewer: galeri foto (zoom/pager), pemutar video & audio (playlist per kategori,
   kecepatan, loop), pembaca PDF (zoom, render per halaman), editor teks/kode
   (undo/redo, find & replace, line numbers, word count), penampil ZIP (list +
@@ -61,22 +64,25 @@ gradle testReleaseUnitTest      # unit test core logic
 ## Keamanan & privasi
 
 - Tidak ada izin internet; tidak ada analitik; `allowBackup=false`.
+- File vault terenkripsi at-rest (AES-256-GCM per-chunk). Key derivation
+  pakai PBKDF2-SHA256 dari PIN. DEK di-wrap ulang saat PIN diubah.
 - Auto-lock vault saat di background (dapat diatur: off/1/5/15 menit) + lock manual;
   semua layar vault ter-guard — sesi terkunci selalu kembali ke kalkulator.
 - Backoff progresif untuk percobaan PIN salah.
-- Catatan desain: agar file bertahan lintas uninstall, vault disimpan plaintext
-  di storage publik (kebutuhan fitur #6/#18 di fitur.txt). Enkripsi at-rest
-  (Secure Vault) ada di roadmap.
+- Catatan desain: vault disimpan di storage publik agar file bertahan lintas
+  uninstall. Enkripsi dilakukan di atas file tersebut.
 
-## Roadmap v1.1+ (backlog hasil review)
+## Roadmap v1.2+ (backlog hasil review)
 
-- Enkripsi file at-rest (AES via Android Keystore) untuk mode Secure Vault
+- Keystore-bound mode (opsional): wrap DEK dengan Android KeyStore agar
+  rahasia PIN tidak bisa di-pull dari backup file
 - Syntax highlighting editor kode, virtualisasi line-number untuk file raksasa
 - Background audio playback (foreground service), subtitle video, PiP
 - Archive: extract selektif per-entry ke folder tujuan
 - Ekstraksi string resource (i18n), pemisahan LibraryViewModel,
   zip/extract turun ke fs-layer, satukan dialog PIN
 - Rate-limit PIN persisten lintas proses; biometric unlock sebagai metode tambahan
+- Zeroize key bytes dari memory setelah use (platform-dependent)
 
 ## Lisensi
 
