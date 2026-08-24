@@ -262,6 +262,17 @@ Signing release membaca env: `KEYSTORE_PATH`, `KEYSTORE_PASSWORD`,
 
 ---
 
+## 🔗 Tautan
+
+| | |
+|------|--------------|
+| 📥 **Download APK** | [GitHub Releases](https://github.com/az925-crypto/Kalku/releases/latest) |
+| 💻 **Source Code** | [github.com/az925-crypto/Kalku](https://github.com/az925-crypto/Kalku) |
+| ☕ **Dukung dev** | [saweria.co/Zsmm](https://saweria.co/Zsmm) |
+| 📢 **Update & info** | [WhatsApp Channel](https://whatsapp.com/channel/0029Vb7ZuEK3QxRtvlO89u0u) |
+
+---
+
 <div align="center">
 
 **Calculator outside. Vault inside. Everything local.**

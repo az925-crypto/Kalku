@@ -1,0 +1,41 @@
+*UPDATE Kalku*
+> Kalku versi *1.2* kini tersedia! Aplikasi brankas file terenkripsi yang nyamar jadi kalkulator ilmiah — 100% offline, tanpa akun, tanpa server.
+
+━━━━━━━━━━━━━━━
+🔐 *FITUR BARU UNGGULAN: SECURE VAULT*
+Semua file yang masuk vault sekarang **terenkripsi otomatis** di penyimpanan (AES-256-GCM per-chunk). File cuma bisa dibuka lewat aplikasi — walau HP di-root atau storage dibaca langsung, isinya tetap sandi.
+
+━━━━━━━━━━━━━━━
+✨ *Yang baru di versi ini:*
+- Enkripsi at-rest AES-256-GCM — tiap file dipecah jadi chunk 16 MB, masing-masing dikunci sendiri
+- Kunci enkripsi diturunkan dari PIN kamu (PBKDF2-SHA256) — gak ada PIN = gak ada data
+- Ganti PIN? Kunci lama otomatis di-wrap ulang, aman walau mati lampu di tengah proses
+- Migration tool — vault versi lama bisa dikonversi ke terenkripsi langsung dari Settings
+- Cache dekripsi nempel sama sesi — lock layar = semua jejak plaintext kehapus total
+- Viewer PDF lebih enteng: cache halaman + hemat memori sampai 50%
+- Editor teks makin cerdas: deteksi file biner, limit 4 MB biar gak bikin app nge-freeze
+- Pemutar audio sekarang load lagu satu-satu, playlist gede gak bikin nunggu lama
+━━━━━━━━━━━━━━━
+🐛 *Perbaikan (hasil audit menyeluruh):*
+• Fix race condition saat dekripsi paralel (file gak bakal korup lagi)
+• Semua operasi database sekarang atomik — mati di tengah jalan gak bikin data setengah jadi
+• Fix copy folder ke dalam foldernya sendiri yang bikin loop tak berujung
+• Proteksi zip-bomb — extract archive jahat dibatasi maksimal 1 GB
+• Percobaan batal/cancel task gak lagi "ditelan diam-diam"
+━━━━━━━━━━━━━━━
+⚠️ *Catatan penting:*
+Lupa PIN = data *tidak bisa dipulihkan*. Gak ada backdoor, gak ada reset — memang itu konsekuensi enkripsi yang bener. Simpan PIN baik-baik!
+
+━━━━━━━━━━━━━━━
+
+[ 📥 *Download APK*]
+https://github.com/az925-crypto/Kalku/releases/latest
+
+[ 💻 *Source Code*]
+https://github.com/az925-crypto/Kalku
+
+[ ☕ *Support*]
+https://saweria.co/Zsmm
+
+[ 📢 *Channel*]
+https://whatsapp.com/channel/0029Vb7ZuEK3QxRtvlO89u0u
