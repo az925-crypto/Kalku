@@ -12,6 +12,9 @@ object ZipUtils {
 
     data class Entry(val name: String, val isDirectory: Boolean, val size: Long)
 
+    /** Upper bound on total uncompressed bytes per extraction (zip-bomb guard). */
+    private const val MAX_TOTAL_UNCOMPRESSED: Long = 1L shl 30 // 1 GiB
+
     fun list(zipFile: File): List<Entry> = ZipFile(zipFile).use { zf ->
         zf.entries().asSequence()
             .filterNot { it.name.contains("..") }
@@ -21,12 +24,14 @@ object ZipUtils {
 
     /**
      * Extracts every entry into [destDir].
-     * Rejects entries whose resolved path escapes [destDir] (Zip Slip).
+     * Rejects entries whose resolved path escapes [destDir] (Zip Slip) and
+     * aborts when the total output would exceed [MAX_TOTAL_UNCOMPRESSED].
      */
     fun extractAll(zipFile: File, destDir: File): Int {
         destDir.mkdirs()
         val canonicalDest = destDir.canonicalPath + File.separator
         var count = 0
+        var written = 0L
         ZipInputStream(zipFile.inputStream().buffered()).use { zis ->
             while (true) {
                 val entry = zis.nextEntry ?: break
@@ -39,6 +44,10 @@ object ZipUtils {
                     out.parentFile?.mkdirs()
                     FileOutputStream(out).use { zis.copyTo(it) }
                     count++
+                    written += out.length()
+                    if (written > MAX_TOTAL_UNCOMPRESSED) {
+                        throw IllegalStateException("Isi archive melebihi batas ekstraksi")
+                    }
                 }
                 zis.closeEntry()
             }
@@ -54,7 +63,15 @@ object ZipUtils {
             val entry: ZipEntry = zf.getEntry(entryName) ?: return null
             val out = File(destDir, entry.name.substringAfterLast('/'))
             if (!out.canonicalPath.startsWith(canonicalDest)) return null
-            zf.getInputStream(entry).use { input -> FileOutputStream(out).use { input.copyTo(it) } }
+            zf.getInputStream(entry).use { input ->
+                FileOutputStream(out).use { output ->
+                    val copied = input.copyTo(output)
+                    if (copied > MAX_TOTAL_UNCOMPRESSED) {
+                        out.delete()
+                        throw IllegalStateException("Entri melebihi batas ekstraksi")
+                    }
+                }
+            }
             return out
         }
     }

@@ -11,6 +11,8 @@ import com.zaaaam.kalku.core.Names
 import com.zaaaam.kalku.data.FileEntity
 import com.zaaaam.kalku.data.RecentEntity
 import com.zaaaam.kalku.data.TrashEntity
+import com.zaaaam.kalku.fs.VaultEncryptionMigrator
+import com.zaaaam.kalku.fs.VaultException
 import com.zaaaam.kalku.fs.VaultPaths
 import com.zaaaam.kalku.fs.ZipUtils
 import com.zaaaam.kalku.fs.emptyTrash
@@ -48,6 +50,80 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
     private val c = (app as KalkuApp).container
     val repo = c.repo
     val settings = c.settings
+    private val decCache = c.decCache
+
+    private val migrator = com.zaaaam.kalku.fs.VaultEncryptionMigrator(repo, c.crypto)
+
+    /** Secure Vault migration progress for Settings UI. */
+    val migration: StateFlow<com.zaaaam.kalku.fs.VaultEncryptionMigrator.State> = migrator.state
+
+    /** True when this session can decrypt (DEK loaded). */
+    fun cryptoActive(): Boolean = repo.isEncrypting()
+
+    /** Plaintext file for display; null when missing or undecryptable. */
+    suspend fun plainDisplayFile(relPath: String): File? =
+        withContext(Dispatchers.IO) { decCache.plainFile(relPath) }
+
+    /**
+     * Toggles Secure Vault. Enabling flips the flag immediately (new writes get
+     * encrypted) then encrypts existing files. Disabling decrypts everything
+     * first — the flag flips only after a fully successful run.
+     *
+     * [pin] is required only when enabling on a legacy plaintext vault that has
+     * no key material yet (the DEK must be wrapped under a PIN-derived KEK).
+     */
+    private var migrationJob: kotlinx.coroutines.Job? = null
+
+    fun toggleEncryption(enable: Boolean, pin: String? = null) {
+        if (migrator.isRunning) return
+        migrationJob = viewModelScope.launch(Dispatchers.IO) {
+            if (enable) {
+                val root = repo.root
+                if (!com.zaaaam.kalku.fs.VaultCryptoStore.hasKeys(root)) {
+                    if (pin.isNullOrEmpty()) {
+                        showToast("Masukkan PIN untuk membuat kunci enkripsi")
+                        return@launch
+                    }
+                    val created = runCatching {
+                        c.crypto.load(com.zaaaam.kalku.fs.VaultCryptoStore.createIfMissing(root, pin))
+                        true
+                    }.getOrElse { showToast(it.message ?: "Gagal membuat kunci"); false }
+                    if (!created) return@launch
+                }
+                settings.setEncryptionEnabled(true)
+                migrator.runSuspend(VaultEncryptionMigrator.Dir.ENCRYPT)
+            } else {
+                val done = migrator.runSuspend(VaultEncryptionMigrator.Dir.DECRYPT)
+                if (done) settings.setEncryptionEnabled(false)
+            }
+        }
+    }
+
+    fun pauseMigration() {
+        migrationJob?.cancel()
+        migrationJob = null
+    }
+
+    fun resumeMigration() {
+        if (migrator.isRunning) return
+        val paused = migration.value as? VaultEncryptionMigrator.State.Paused
+        migrationJob = viewModelScope.launch(Dispatchers.IO) {
+            val dir = paused?.direction ?: run {
+                // Unknown direction (fresh process): infer from the mode flag.
+                if (settings.currentEncryptionEnabled()) VaultEncryptionMigrator.Dir.ENCRYPT else VaultEncryptionMigrator.Dir.DECRYPT
+            }
+            migrator.runSuspend(dir)
+        }
+    }
+
+    /** Files still plaintext while the mode is ON (-1 = not computed yet). */
+    private val pendingPlainCount = MutableStateFlow(-1)
+    val unencryptedPending: StateFlow<Int> = pendingPlainCount
+
+    fun refreshUnencryptedPending() = viewModelScope.launch(Dispatchers.IO) {
+        pendingPlainCount.value =
+            migrator.collectTargets(com.zaaaam.kalku.fs.VaultEncryptionMigrator.Dir.ENCRYPT).size
+    }
 
     /** True when full storage access granted and root usable. */
     fun storageFullAccess(): Boolean = VaultPaths.hasFullAccess(getApplication())
@@ -130,11 +206,17 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
 
     // ------------------------------------------------------------------- ops
 
-    val toast = MutableStateFlow<String?>(null)
+    /** Identified payload: identical messages in a row still re-trigger the snackbar. */
+    data class ToastEvent(val id: Long, val msg: String)
 
-    private fun fail(e: Exception) { toast.value = e.message ?: "Operation failed" }
+    private val _toast = MutableStateFlow<ToastEvent?>(null)
+    val toast: StateFlow<ToastEvent?> = _toast
 
-    fun dismissToast() { toast.value = null }
+    fun showToast(msg: String) { _toast.value = ToastEvent(System.nanoTime(), msg) }
+
+    private fun fail(e: Exception) { showToast(e.message ?: "Operation failed") }
+
+    fun dismissToast() { _toast.value = null }
 
     fun launchIntent(intent: Intent) = viewModelScope.launch {
         withContext(Dispatchers.Main) {
@@ -147,7 +229,13 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun runIo(block: suspend () -> Unit) = viewModelScope.launch(Dispatchers.IO) {
-        try { block() } catch (e: Exception) { fail(e) }
+        try {
+            block()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            fail(e)
+        }
     }
 
     /** Builds the share chooser off-thread, then fires it on the main thread. */
@@ -155,7 +243,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
         val intent = withContext(Dispatchers.IO) {
             try {
                 if (entries.any { it.isFolder }) {
-                    toast.value = "Folders cannot be shared directly — zip them first"
+                    showToast("Folders cannot be shared directly — zip them first")
                     null
                 } else {
                     val uris = entries.map { repo.shareUri(it.relPath) }
@@ -171,7 +259,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
 
     fun import(uris: List<Uri>, destParent: String) = runIo {
         val created = repo.importUris(uris, destParent)
-        toast.value = "${created.size} file(s) imported"
+        showToast("${created.size} file(s) imported")
     }
 
     fun createFolder(parent: String, name: String) = runIo { repo.createFolder(parent, name) }
@@ -192,7 +280,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
 
     fun permanentDelete(trashId: Long) = runIo { repo.permanentDelete(trashId) }
 
-    fun emptyTrash() = runIo { repo.emptyTrash(); toast.value = "Trash emptied" }
+    fun emptyTrash() = runIo { repo.emptyTrash(); showToast("Trash emptied" })
 
     fun purgeExpired(days: Int) = runIo { repo.purgeExpired(days) }
 
@@ -209,60 +297,109 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
     fun export(entry: FileEntity, destUri: Uri) = runIo {
         require(!entry.isFolder) { "Export folders as ZIP instead" }
         repo.exportTo(entry.relPath, destUri)
-        toast.value = "Exported"
+        showToast("Exported")
     }
 
     fun readTextSafe(relPath: String): String? =
         try { repo.readText(relPath) } catch (e: Exception) { fail(e); null }
 
-    fun writeTextSafe(relPath: String, content: String) = runIo { repo.writeText(relPath, content) }
+    /** Writes text back; returns false (after toasting) so callers can keep their dirty flag. */
+    suspend fun writeTextSafe(relPath: String, content: String): Boolean =
+        try {
+            repo.writeText(relPath, content)
+            true
+        } catch (e: Exception) {
+            fail(e); false
+        }
 
-    fun saveTextAs(parent: String, rawName: String, content: String, onSaved: (Long) -> Unit) = runIo {
-        val entity = repo.createTextFile(parent, rawName, content)
-        onSaved(entity.id)
+    /** True when the file on disk carries the encrypted-vault header. */
+    fun isPathEncrypted(relPath: String): Boolean =
+        com.zaaaam.kalku.core.crypto.VaultFileFormat.isEncrypted(repo.fileOf(relPath))
+
+    fun saveTextAs(parent: String, rawName: String, content: String, onSaved: (FileEntity) -> Unit) = runIo {
+        // Exact name: silently uniquifying here produced surprise duplicates
+        // ("note (2).txt") on every subsequent save.
+        val entity = repo.createTextFileExact(parent, rawName, content)
+        onSaved(entity)
     }
 
-    /** Compresses selected entries into a new ZIP inside [destParent]. */
+    /** Compresses selected entries into a new ZIP inside [destParent].
+     *  Sources are staged as plaintext first (via the decrypted cache) so
+     *  ciphertext is never zipped; the result goes through the normal import
+     *  pipeline (encrypt + index). The cache file is zipped directly — no
+     *  second plaintext copy is made. */
     fun zipEntries(entries: List<FileEntity>, destParent: String, rawZipName: String) = runIo {
         require(entries.isNotEmpty()) { "Nothing selected" }
-        val destDir = repo.fileOf(destParent)
-        val taken = destDir.list()?.toSet() ?: emptySet()
-        val finalName = Names.uniqueName(rawZipName.ifBlank { "archive" }.removeSuffix(".zip") + ".zip", taken)
-        val outFile = File(destDir, finalName)
-        val sources = entries.map { repo.fileOf(it.relPath) }
-        withContext(Dispatchers.IO) { ZipUtils.compress(sources, outFile) }
-        repo.insertFileRow(outFile, destParent, ByteArray(0))
-        toast.value = "ZIP created: $finalName"
+        withContext(Dispatchers.IO) {
+            val stage = File(getApplication<KalkuApp>().cacheDir, "zip_stage").also { it.mkdirs() }
+            // Honor the requested name; uniquify per run so concurrent zips and
+            // importLocalFile collisions never overwrite each other.
+            val base = Names.sanitizeFileName(rawZipName.ifBlank { "archive" }.removeSuffix(".zip")).ifBlank { "archive" }
+            val tmpZip = File(stage, "$base-${System.currentTimeMillis()}.zip")
+            try {
+                val staged = mutableListOf<File>()
+                for (entry in entries) {
+                    val src = repo.fileOf(entry.relPath)
+                    if (!src.exists()) continue
+                    when {
+                        entry.isFolder -> {
+                            val destFolder = File(stage, "${entry.id}_${entry.name}").also { it.mkdirs() }
+                            stageTreeDecrypted(src, entry.relPath, destFolder)
+                            staged += destFolder
+                        }
+                        else -> staged += decCache.plainFile(entry.relPath)
+                            ?: throw VaultException("Tidak bisa dekripsi ${entry.name}")
+                    }
+                }
+                ZipUtils.compress(staged, tmpZip)
+                val finalName = repo.importLocalFile(tmpZip, destParent)
+                showToast(finalName?.let { "ZIP created: $it" } ?: "Gagal membuat ZIP")
+            } finally {
+                stage.deleteRecursively()
+            }
+        }
     }
 
     /** Extracts an archive into a sibling folder named after it. */
     fun extractArchive(archiveId: Long) = runIo {
         val archive = repo.byId(archiveId) ?: error("Not found")
-        val zipFile = repo.fileOf(archive.relPath)
         val targetRel = archive.relPath.removeSuffix(".zip").removeSuffix(".ZIP")
-        val target = repo.fileOf(targetRel)
-        val n = withContext(Dispatchers.IO) { ZipUtils.extractAll(zipFile, target) }
-        val parent = targetRel.substringBeforeLast('/', "")
-        repo.fileDao.upsert(
-            FileEntity(
-                relPath = targetRel,
-                name = targetRel.substringAfterLast('/'),
-                parent = parent,
-                isFolder = true,
-                category = Category.OTHER.name,
-                mime = "",
-                size = 0,
-                createdAt = System.currentTimeMillis(),
-                modifiedAt = System.currentTimeMillis(),
-            )
-        )
-        repo.indexTreeUnder(target, targetRel)
-        toast.value = "$n file(s) extracted"
+        withContext(Dispatchers.IO) {
+            val plainZip = decCache.plainFile(archive.relPath)
+            if (plainZip == null || !plainZip.exists()) {
+                throw VaultException("Tidak bisa dekripsi ${archive.name}")
+            }
+            // Extract outside the vault, then import through the normal pipeline:
+            // folder rows, transparent re-encryption and correct sizes.
+            val tmpExtract = File(getApplication<KalkuApp>().cacheDir, "extract_${System.currentTimeMillis()}")
+            try {
+                val n = ZipUtils.extractAll(plainZip, tmpExtract)
+                repo.importTree(tmpExtract, targetRel)
+                showToast("$n file(s) extracted")
+            } finally {
+                tmpExtract.deleteRecursively()
+            }
+        }
+    }
+
+    /** Stages [srcDirOnDisk] (vault folder [srcVaultRel]) as plaintext under [destDir]. */
+    private fun stageTreeDecrypted(srcDirOnDisk: File, srcVaultRel: String, destDir: File) {
+        srcDirOnDisk.listFiles()?.sortedBy { it.name.lowercase() }?.forEach { f ->
+            val dst = File(destDir, f.name)
+            if (f.isDirectory) {
+                dst.mkdirs()
+                stageTreeDecrypted(f, com.zaaaam.kalku.fs.join(srcVaultRel, f.name), dst)
+            } else {
+                val plain = decCache.plainFile(com.zaaaam.kalku.fs.join(srcVaultRel, f.name))
+                    ?: throw VaultException("Tidak bisa dekripsi ${f.name}")
+                plain.inputStream().use { input -> dst.outputStream().use { input.copyTo(it) } }
+            }
+        }
     }
 
     fun rebuildIndex() = runIo {
         val n = repo.scan()
-        toast.value = "Index rebuilt: $n files indexed"
+        showToast("Index rebuilt: $n files indexed")
     }
 
     companion object {

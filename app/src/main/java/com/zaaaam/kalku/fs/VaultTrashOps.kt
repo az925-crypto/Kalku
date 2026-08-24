@@ -3,11 +3,13 @@ package com.zaaaam.kalku.fs
 import android.content.Intent
 import android.net.Uri
 import androidx.core.content.FileProvider
+import androidx.room.withTransaction
 import com.zaaaam.kalku.core.CategoryDetector
 import com.zaaaam.kalku.core.Names
 import com.zaaaam.kalku.data.FileEntity
 import com.zaaaam.kalku.data.TrashEntity
 import kotlinx.coroutines.flow.first
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.util.UUID
 
@@ -34,30 +36,35 @@ suspend fun VaultRepo.trash(ids: List<Long>) {
         }
         // Metadata is kept but repathed under the virtual bin prefix so the
         // original relPath becomes immediately reusable without conflicts.
-        fileDao.markDeleted(entry.relPath, likeEscaped(entry.relPath))
-        val affected = fileDao.allDeleted().filter {
-            it.relPath == entry.relPath || it.relPath.startsWith("${entry.relPath}/")
-        }
-        val virtualTop = TRASH_VIRTUAL_PREFIX + trashName
-        for (r in affected) {
-            if (trashName.isNotEmpty()) {
-                val sub = r.relPath.removePrefix(entry.relPath)
-                val virtual = virtualTop + sub
-                fileDao.repathEntry(r.id, virtual, virtual.substringBeforeLast('/', ""), virtual.substringAfterLast('/'))
+        // One transaction: a crash mid-way must not leave rows half-deleted
+        // with no TrashEntity to restore from.
+        db.withTransaction {
+            fileDao.markDeleted(entry.relPath, likeEscaped(entry.relPath))
+            val affected = fileDao.allDeleted().filter {
+                it.relPath == entry.relPath || it.relPath.startsWith("${entry.relPath}/")
             }
-        }
-        trashDao().insert(
-            TrashEntity(
-                trashName = trashName,
-                name = entry.name,
-                originalRelPath = entry.relPath,
-                originalParent = entry.parent,
-                isFolder = entry.isFolder,
-                category = entry.category,
-                size = entry.size,
-                deletedAt = System.currentTimeMillis(),
+            val virtualTop = TRASH_VIRTUAL_PREFIX + trashName
+            for (r in affected) {
+                if (trashName.isNotEmpty()) {
+                    val sub = r.relPath.removePrefix(entry.relPath)
+                    val virtual = virtualTop + sub
+                    fileDao.repathEntry(r.id, virtual, virtual.substringBeforeLast('/', ""), virtual.substringAfterLast('/'))
+                }
+            }
+            trashDao().insert(
+                TrashEntity(
+                    trashName = trashName,
+                    name = entry.name,
+                    originalRelPath = entry.relPath,
+                    originalParent = entry.parent,
+                    isFolder = entry.isFolder,
+                    category = entry.category,
+                    size = entry.size,
+                    deletedAt = System.currentTimeMillis(),
+                )
             )
-        )
+        }
+        notifyMutated(entry.relPath)
     }
 }
 
@@ -77,18 +84,24 @@ suspend fun VaultRepo.restore(trashId: Long) {
     val newPath = join(row.originalParent, finalName)
     if (row.trashName.isNotEmpty()) {
         val curPrefix = TRASH_VIRTUAL_PREFIX + row.trashName
-        for (r in fileDao.allDeleted()) {
-            val mapped = when {
-                r.relPath == curPrefix -> newPath
-                r.relPath.startsWith("$curPrefix/") -> newPath + r.relPath.removePrefix(curPrefix)
-                else -> null
-            } ?: continue
-            fileDao.repathEntry(r.id, mapped, mapped.substringBeforeLast('/', ""), mapped.substringAfterLast('/'))
+        db.withTransaction {
+            for (r in fileDao.allDeleted()) {
+                val mapped = when {
+                    r.relPath == curPrefix -> newPath
+                    r.relPath.startsWith("$curPrefix/") -> newPath + r.relPath.removePrefix(curPrefix)
+                    else -> null
+                } ?: continue
+                fileDao.repathEntry(r.id, mapped, mapped.substringBeforeLast('/', ""), mapped.substringAfterLast('/'))
+            }
+            fileDao.markAlive(newPath, likeEscaped(newPath))
         }
-        fileDao.markAlive(newPath, likeEscaped(newPath))
+        notifyMutated(curPrefix)
     } else {
         // Legacy/meta-only row that never moved on disk.
-        fileDao.markAlive(row.originalRelPath, likeEscaped(row.originalRelPath))
+        db.withTransaction {
+            fileDao.markAlive(row.originalRelPath, likeEscaped(row.originalRelPath))
+        }
+        notifyMutated(row.originalRelPath)
     }
     trashDao().delete(trashId)
 }
@@ -98,14 +111,23 @@ suspend fun VaultRepo.permanentDelete(trashId: Long) {
     if (row.trashName.isNotEmpty()) {
         val f = File(VaultPaths.trashDir(root), row.trashName)
         if (f.exists()) f.deleteRecursively()
-        fileDao.deleteTree(
-            TRASH_VIRTUAL_PREFIX + row.trashName,
-            likeEscaped(TRASH_VIRTUAL_PREFIX + row.trashName),
-        )
+        db.withTransaction {
+            fileDao.deleteTree(
+                TRASH_VIRTUAL_PREFIX + row.trashName,
+                likeEscaped(TRASH_VIRTUAL_PREFIX + row.trashName),
+            )
+            trashDao().delete(trashId)
+        }
+        notifyMutated(TRASH_VIRTUAL_PREFIX + row.trashName)
     } else {
-        fileDao.deleteTree(row.originalRelPath, likeEscaped(row.originalRelPath))
+        // Legacy/meta-only row that never moved on disk. Only delete rows still
+        // marked deleted — a live file may have reused this path in the meantime.
+        db.withTransaction {
+            fileDao.deleteTreeIfDeleted(row.originalRelPath, likeEscaped(row.originalRelPath))
+            trashDao().delete(trashId)
+        }
+        notifyMutated(row.originalRelPath)
     }
-    trashDao().delete(trashId)
 }
 
 suspend fun VaultRepo.emptyTrash(): Int {
@@ -126,14 +148,23 @@ suspend fun VaultRepo.purgeExpired(retentionDays: Int): Int {
 // ---------------------------------------------------------------- share/export
 
 
-/** Content URI for sharing; stages through cache when running on fallback storage. */
+/** Content URI for sharing; always stages decrypted copies through cache when
+ *  the file is encrypted or running on fallback storage. */
 fun VaultRepo.shareUri(relPath: String): Uri {
     val f = fileOf(relPath)
     require(f.isFile && f.exists()) { "Not a readable file" }
-    return if (storage.isFallback) {
+    val needsStage = storage.isFallback ||
+        com.zaaaam.kalku.core.crypto.VaultFileFormat.isEncrypted(f)
+    return if (needsStage) {
         val stage = File(appContext.cacheDir, "share").also { it.mkdirs() }
-        val staged = File(stage, f.name)
-        f.copyTo(staged, overwrite = true)
+        // Multi-select can include same-named files from different folders:
+        // staging with the raw name would silently overwrite an earlier copy
+        // and share the wrong content.
+        val uniqueName = Names.uniqueName(f.name, stage.list()?.toSet() ?: emptySet())
+        val staged = File(stage, uniqueName)
+        plainStream(f).use { input ->
+            staged.outputStream().use { input.copyTo(it) }
+        }
         FileProvider.getUriForFile(appContext, appContext.packageName + ".fileprovider", staged)
     } else {
         FileProvider.getUriForFile(appContext, appContext.packageName + ".fileprovider", f)
@@ -154,7 +185,7 @@ fun VaultRepo.exportTo(relPath: String, destUri: Uri) {
     val src = fileOf(relPath)
     require(src.isFile) { "Not a file" }
     appContext.contentResolver.openOutputStream(destUri)?.use { out ->
-        src.inputStream().use { it.copyTo(out) }
+        plainStream(src).use { it.copyTo(out) }
     } ?: throw VaultException("Cannot open destination")
 }
 
@@ -163,15 +194,31 @@ fun VaultRepo.exportTo(relPath: String, destUri: Uri) {
 fun VaultRepo.readText(relPath: String): String {
     val f = fileOf(relPath)
     require(f.isFile && f.exists()) { "Not a readable file" }
-    return String(f.readBytes(), Charsets.UTF_8)
+    return plainStream(f).use { String(it.readBytes(), Charsets.UTF_8) }
 }
 
-/** Writes text content back, refreshing size/mtime metadata. */
+/** Writes text content back, refreshing size/mtime metadata.
+ *  Atomic: writes a sibling temp then renames over the target, so a process
+ *  death mid-write can never truncate (and thus corrupt) the original. */
 suspend fun VaultRepo.writeText(relPath: String, content: String) {
     val f = fileOf(relPath)
     assertInside(f)
-    f.writeText(content)
+    // writeThrough's downgrade refusal checks the DESTINATION; a fresh temp
+    // would bypass it, so guard explicitly before touching anything.
+    if (f.exists() && com.zaaaam.kalku.core.crypto.VaultFileFormat.isEncrypted(f) && !isEncrypting()) {
+        throw VaultException("Vault terkunci — buka PIN lagi sebelum menyimpan")
+    }
+    // ".part" is skipped by scan() and migration target collection, so a
+    // leftover temp can never be indexed or converted.
+    val tmp = File(f.parentFile, "${f.name}.part")
+    try {
+        writeThrough(ByteArrayInputStream(content.toByteArray(Charsets.UTF_8)), tmp)
+        if (!tmp.renameTo(f)) throw VaultException("Gagal menyimpan ${f.name}")
+    } finally {
+        tmp.delete()
+    }
     fileDao.updateStat(relPath, f.length(), System.currentTimeMillis())
+    notifyMutated(relPath)
 }
 
 // ------------------------------------------------------------- index rebuild
@@ -193,12 +240,17 @@ suspend fun VaultRepo.scan(): Int {
             ?.sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
             ?.forEach { f ->
                 if (dirRel.isEmpty() && f.name in skipNames) return@forEach
+                // Never index temp leftovers from interrupted conversions.
+                if (f.name.endsWith(".kmig") || f.name.endsWith(".part")) return@forEach
                 val rel = join(dirRel, f.name)
                 if (f.isDirectory) {
                     indexed += folderEntity(rel, dirRel)
                     walk(f, rel)
                 } else {
                     val cat = CategoryDetector.detect(f.name, readHeader(f))
+                    // Prefer the real disk mtime so externally-modified files keep
+                    // meaningful Modified dates even before any DB row exists.
+                    val mtime = f.lastModified().takeIf { it > 0 } ?: now
                     indexed += FileEntity(
                         relPath = rel,
                         name = f.name,
@@ -207,8 +259,8 @@ suspend fun VaultRepo.scan(): Int {
                         category = cat.name,
                         mime = CategoryDetector.mimeOf(cat, f.name),
                         size = f.length(),
-                        createdAt = now,
-                        modifiedAt = now,
+                        createdAt = mtime,
+                        modifiedAt = mtime,
                     )
                 }
             }
@@ -220,7 +272,15 @@ suspend fun VaultRepo.scan(): Int {
     val existing = fileDao.all().associateBy { it.relPath }
     val preserved = indexed.map { e ->
         existing[e.relPath]?.let { old ->
-            e.copy(id = old.id, favorite = old.favorite, tags = old.tags, createdAt = old.createdAt)
+            // Keep stable ids and user metadata. modifiedAt survives rescans, yet
+            // still advances when a file was edited externally (disk mtime newer).
+            e.copy(
+                id = old.id,
+                favorite = old.favorite,
+                tags = old.tags,
+                createdAt = old.createdAt,
+                modifiedAt = maxOf(old.modifiedAt, e.modifiedAt),
+            )
         } ?: e
     }
     fileDao.upsertAll(preserved)

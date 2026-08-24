@@ -5,7 +5,6 @@ import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,16 +28,19 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.zaaaam.kalku.fs.ZipUtils
 import com.zaaaam.kalku.vault.VaultViewModel
+import kotlinx.coroutines.asCoroutineDispatcher
 import java.io.File
 
 // ---------------------------------------------------------------- pdf viewer
@@ -46,22 +48,64 @@ import java.io.File
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PdfViewerScreen(vm: VaultViewModel, id: Long, onBack: () -> Unit) {
-    val entry = entryOrNull(vm, id)
+    val entry = EntryGate(vm, id, onBack)
     if (entry == null) {
-        Box(Modifier.fillMaxSize().background(Color.Black))
         return
     }
     RecordOpen(vm, entry.id)
 
-    val file = remember(entry.id) { File(vm.repo.root, entry.relPath) }
-    val pageCount = remember(entry.id) {
-        try {
-            ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
-                PdfRenderer(fd).pageCount
-            }
-        } catch (e: Exception) { -1 }
+    // Encrypted vault files need a decrypted, seekable copy for PdfRenderer.
+    var pdfFile by remember(entry.id) { mutableStateOf<File?>(null) }
+    LaunchedEffect(entry.id) {
+        pdfFile = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            vm.plainDisplayFile(entry.relPath)
+        }
     }
-    val pages = remember(pageCount) { if (pageCount > 0) (0 until pageCount).toList() else emptyList() }
+    val file = pdfFile
+
+    if (file == null) {
+        Column(Modifier.fillMaxSize()) {
+            ViewerTopBar(title = entry.name, favorite = entry.favorite, onBack = onBack,
+                onToggleFavorite = { vm.toggleFavorite(entry) }, onShare = {}, onDelete = {})
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Membuka PDF…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        return
+    }
+
+    // One renderer owned by the screen: constructing a fresh PdfRenderer per
+    // page re-parsed the entire document for every render.
+    var rendererState by remember(file) { mutableStateOf<PdfRenderer?>(null) }
+    var pdfLoadDone by remember(file) { mutableStateOf(false) }
+    LaunchedEffect(file) {
+        rendererState = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+                try {
+                    PdfRenderer(pfd)
+                } catch (e: Exception) {
+                    pfd.close()
+                    null
+                }
+            } catch (_: Exception) {
+                null
+            }
+        }
+        pdfLoadDone = true
+    }
+    // Serial dispatcher: PdfRenderer is not thread-safe, and Dispatchers.IO
+    // would happily render two pages concurrently.
+    val renderDispatcher = remember(file) {
+        java.util.concurrent.Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+    }
+    androidx.compose.runtime.DisposableEffect(file) {
+        onDispose {
+            rendererState?.close()
+            renderDispatcher.close()
+        }
+    }
+    val renderer = rendererState
 
     Column(Modifier.fillMaxSize()) {
         ViewerTopBar(
@@ -74,22 +118,39 @@ fun PdfViewerScreen(vm: VaultViewModel, id: Long, onBack: () -> Unit) {
             extraActions = {},
             onInfo = null,
         )
-        if (pageCount < 0) {
+        if (renderer == null && !pdfLoadDone) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Membuka PDF…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } else if (renderer == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("PDF tidak dapat dibuka", color = MaterialTheme.colorScheme.error)
             }
         } else {
+            val pageCount = renderer.pageCount
+            val pages = remember(pageCount) { (0 until pageCount).toList() }
             var zoom by remember { mutableFloatStateOf(1f) }
+            // Cache is owned by the screen, not per-page: a per-page DisposableEffect
+            // cleared the whole map whenever one page left composition, throwing away
+            // still-visible pages that then stayed stuck on "Rendering…" forever.
+            val pageCache = remember(entry.id) { mutableStateMapOf<String, Bitmap>() }
+            val renderOrder = remember(entry.id) { mutableListOf<String>() }
+            val inFlight = remember(entry.id) { mutableSetOf<String>() }
+            androidx.compose.runtime.DisposableEffect(entry.id) {
+                onDispose {
+                    pageCache.clear()
+                    renderOrder.clear()
+                    inFlight.clear()
+                }
+            }
             LazyColumn(
-                Modifier.fillMaxSize().pointerInput(Unit) {
-                    detectTransformGestures { _, _, zoomDelta, _ ->
-                        zoom = (zoom * zoomDelta).coerceIn(1f, 5f)
-                    }
+                Modifier.fillMaxSize().twoFingerTransform { zoomDelta, _ ->
+                    zoom = (zoom * zoomDelta).coerceIn(1f, 5f)
                 },
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 itemsIndexed(pages, key = { _, p -> p }) { index, page ->
-                    PdfPage(file, page, zoom)
+                    PdfPage(renderer, renderDispatcher, page, pageCache, renderOrder, inFlight)
                     Text(
                         "${index + 1} / $pageCount",
                         style = MaterialTheme.typography.labelSmall,
@@ -102,44 +163,71 @@ fun PdfViewerScreen(vm: VaultViewModel, id: Long, onBack: () -> Unit) {
     }
 }
 
-private val pageCache = mutableStateMapOf<String, Bitmap>()
+private const val PAGE_CACHE_LIMIT = 6
 
-@Composable
-private fun PdfPage(file: File, pageIndex: Int, zoom: Float) {
-    LaunchedEffect(file.path, pageIndex) {
-        val key = "${file.path}#$pageIndex"
-        if (!pageCache.contains(key)) {
-            // Decode off the main thread; PdfRenderer is blocking I/O.
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                try {
-                    ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
-                        PdfRenderer(fd).use { renderer ->
-                            renderer.openPage(pageIndex).use { page ->
-                                val w = (page.width * 2.2f).toInt().coerceAtMost(2200)
-                                val h = (page.height * w.toFloat() / page.width).toInt()
-                                val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-                                bmp.eraseColor(android.graphics.Color.WHITE)
-                                page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                                if (pageCache.size > 12) pageCache.clear() // simple memory cap
-                                pageCache[key] = bmp
-                            }
-                        }
-                    }
-                } catch (_: Exception) {
-                }
+/** Renders one page off the main thread; returns null on any failure incl. OOM. */
+private suspend fun renderPage(
+    renderer: PdfRenderer,
+    dispatcher: kotlinx.coroutines.CoroutineDispatcher,
+    pageIndex: Int,
+): Bitmap? =
+    try {
+        kotlinx.coroutines.withContext(dispatcher) {
+            renderer.openPage(pageIndex).use { page ->
+                // Cap bitmap size: full-res pages at 2200px could OOM the
+                // process on large scanned PDFs (× cache limit). RGB_565 halves
+                // memory vs ARGB_8888 — fine for opaque rendered pages.
+                val w = (page.width * 2.2f).toInt().coerceAtMost(1600)
+                val h = (page.height * w.toFloat() / page.width).toInt()
+                val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.RGB_565)
+                bmp.eraseColor(android.graphics.Color.WHITE)
+                page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                bmp
             }
         }
+    } catch (t: Throwable) {
+        // Includes OutOfMemoryError and races against renderer close on dispose —
+        // never crash the viewer over a bad page.
+        null
     }
-    androidx.compose.runtime.DisposableEffect(file.path) {
-        onDispose { pageCache.clear() }
+
+@Composable
+private fun PdfPage(
+    renderer: PdfRenderer,
+    renderDispatcher: kotlinx.coroutines.CoroutineDispatcher,
+    pageIndex: Int,
+    pageCache: androidx.compose.runtime.snapshots.SnapshotStateMap<String, Bitmap>,
+    renderOrder: MutableList<String>,
+    inFlight: MutableSet<String>,
+) {
+    val key = "${renderer.hashCode()}#$pageIndex"
+    LaunchedEffect(key) {
+        if (pageCache.containsKey(key) || !inFlight.add(key)) return@LaunchedEffect
+        // Decode off the main thread; PdfRenderer is blocking I/O.
+        val bmp = renderPage(renderer, renderDispatcher, pageIndex)
+        inFlight.remove(key)
+        if (bmp != null && !pageCache.containsKey(key)) {
+            // Evict oldest entries instead of clearing everything.
+            while (renderOrder.size >= PAGE_CACHE_LIMIT) {
+                pageCache.remove(renderOrder.removeAt(0))
+            }
+            renderOrder.add(key)
+            pageCache[key] = bmp
+        }
     }
-    val key = "${file.path}#$pageIndex"
     val bmp = pageCache[key]
     if (bmp != null) {
         Image(
             bitmap = bmp.asImageBitmap(),
             contentDescription = "Page ${pageIndex + 1}",
-            modifier = Modifier.fillMaxWidth(zoom.coerceAtMost(1f)).padding(horizontal = 4.dp),
+            // Real visual zoom: fillMaxWidth(zoom.coerceAtMost(1f)) could never exceed 1f.
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp)
+                .graphicsLayer {
+                    scaleX = zoom
+                    scaleY = zoom
+                },
         )
     } else {
         Box(Modifier.fillMaxWidth().height(400.dp), contentAlignment = Alignment.Center) {
@@ -153,16 +241,31 @@ private fun PdfPage(file: File, pageIndex: Int, zoom: Float) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ArchiveViewerScreen(vm: VaultViewModel, id: Long, onBack: () -> Unit) {
-    val entry = entryOrNull(vm, id)
+    val entry = EntryGate(vm, id, onBack)
     if (entry == null) {
-        Box(Modifier.fillMaxSize())
         return
     }
-    val file = remember(entry.id) { File(vm.repo.root, entry.relPath) }
-    val entries = remember(entry.id) {
-        runCatching { ZipUtils.list(file) }.getOrDefault(emptyList())
-    }
     RecordOpen(vm, entry.id)
+
+    // ZIP listing needs a seekable plaintext file.
+    var zipFile by remember(entry.id) { mutableStateOf<File?>(null) }
+    LaunchedEffect(entry.id) {
+        zipFile = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            vm.plainDisplayFile(entry.relPath)
+        }
+    }
+
+    val file = zipFile
+
+    // ZIP central-directory parsing is disk I/O — keep it off the main thread
+    // and out of composition (remember{} used to run it synchronously).
+    var entriesState by remember(file) { mutableStateOf<List<ZipUtils.Entry>?>(null) }
+    LaunchedEffect(file) {
+        entriesState = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            file?.let { runCatching { ZipUtils.list(it) }.getOrDefault(emptyList()) }
+        }
+    }
+    val entries = entriesState ?: emptyList()
 
     Column(Modifier.fillMaxSize()) {
         ViewerTopBar(
@@ -180,13 +283,17 @@ fun ArchiveViewerScreen(vm: VaultViewModel, id: Long, onBack: () -> Unit) {
             onInfo = null,
         )
         Text(
-            "${entries.count { !it.isDirectory }} files · ${com.zaaaam.kalku.core.Format.bytes(entries.sumOf { it.size })}",
+            when {
+                file == null || entriesState == null -> "Membuka archive…"
+                else -> "${entries.count { !it.isDirectory }} files · ${com.zaaaam.kalku.core.Format.bytes(entries.sumOf { it.size })}"
+            },
             Modifier.padding(12.dp),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         androidx.compose.foundation.lazy.LazyColumn(Modifier.fillMaxSize()) {
-            itemsIndexed(entries.filterNot { it.isDirectory }, key = { _, e -> e.name }) { _, zipEntry ->
+            // Composite key: legal ZIPs may contain duplicate entry names.
+            itemsIndexed(entries.filterNot { it.isDirectory }, key = { idx, e -> "$idx:${e.name}" }) { _, zipEntry ->
                 ListItem(
                     headlineContent = {
                         Text(zipEntry.name, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
@@ -194,9 +301,29 @@ fun ArchiveViewerScreen(vm: VaultViewModel, id: Long, onBack: () -> Unit) {
                     supportingContent = { Text(com.zaaaam.kalku.core.Format.bytes(zipEntry.size)) },
                     trailingContent = {
                         androidx.compose.material3.TextButton(onClick = {
+                            val f = file ?: return@TextButton
                             vm.runIo {
-                                ZipUtils.extractEntry(file, zipEntry.name, file.parentFile ?: return@runIo)
-                                vm.toast.value = "Extracted: ${zipEntry.name.substringAfterLast('/')}"
+                                // Extract through the vault pipeline so the entry
+                                // lands in the archive's folder (encrypted when
+                                // the session is), not in an invisible cache dir.
+                                // Unique per run: concurrent extracts must not
+                                // share one staging dir.
+                                val stage = java.io.File(vm.repo.appContext.cacheDir,
+                                    "entry_extract_${System.currentTimeMillis()}")
+                                    .also { it.mkdirs() }
+                                try {
+                                    val out = ZipUtils.extractEntry(f, zipEntry.name, stage)
+                                    if (out != null) {
+                                        val parentRel = entry.relPath.substringBeforeLast('/', "")
+                                        val imported = vm.repo.importLocalFile(out, parentRel)
+                                        vm.showToast(imported?.let { "Extracted: $it" }
+                                            ?: "Gagal extract ${zipEntry.name.substringAfterLast('/')}")
+                                    } else {
+                                        vm.showToast("Gagal extract ${zipEntry.name}")
+                                    }
+                                } finally {
+                                    stage.deleteRecursively()
+                                }
                             }
                         }) { Text("Extract") }
                     },

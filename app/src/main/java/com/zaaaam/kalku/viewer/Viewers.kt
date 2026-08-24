@@ -1,7 +1,10 @@
 package com.zaaaam.kalku.viewer
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,9 +48,34 @@ import com.zaaaam.kalku.data.FileEntity
 import com.zaaaam.kalku.vault.VaultViewModel
 import java.io.File
 
-@Composable
-internal fun entryOrNull(vm: VaultViewModel, id: Long): FileEntity? =
-    vm.allFiles.collectAsState().value.firstOrNull { it.id == id }
+/**
+ * Pinch-zoom/pan that only engages with two pointers. Single-finger gestures
+ * stay unconsumed so parent LazyColumns and HorizontalPager keep working.
+ */
+internal fun Modifier.twoFingerTransform(onTransform: (zoom: Float, pan: Offset) -> Unit): Modifier =
+    pointerInput(Unit) {
+        awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false)
+            var engaged = false
+            while (true) {
+                val event = awaitPointerEvent()
+                val pressedCount = event.changes.count { it.pressed }
+                when {
+                    pressedCount >= 2 -> {
+                        engaged = true
+                        onTransform(event.calculateZoom(), event.calculatePan())
+                        event.changes.forEach { it.consume() }
+                    }
+                    engaged -> {
+                        if (event.changes.none { it.pressed }) break
+                        // Swallow remaining lifts so the parent doesn't fling.
+                        event.changes.forEach { it.consume() }
+                    }
+                    else -> break
+                }
+            }
+        }
+    }
 
 @Composable
 internal fun ViewerTopBar(
@@ -108,6 +136,64 @@ private fun InfoRow(k: String, v: String) {
     }
 }
 
+/** Shown when a routed file id no longer resolves; auto-returns to safety. */
+@Composable
+internal fun MissingEntryScreen(onBack: () -> Unit) {
+    Column(Modifier.fillMaxSize().background(Color.Black)) {
+        ViewerTopBar(
+            title = "Tidak ditemukan",
+            favorite = false,
+            onBack = onBack,
+            onToggleFavorite = {},
+            onShare = {},
+            onDelete = {},
+        )
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("File tidak ditemukan", color = Color.White.copy(alpha = 0.6f))
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(1200)
+        onBack()
+    }
+}
+
+/**
+ * Shown when the routed id isn't resolved YET because the index flow hasn't
+ * emitted its first frame (cold start on a big vault). Without this, viewers
+ * flashed "not found" and kicked back for perfectly valid files.
+ */
+@Composable
+internal fun EntryLoadingScreen(onBack: () -> Unit) {
+    Column(Modifier.fillMaxSize().background(Color.Black)) {
+        ViewerTopBar(
+            title = "Memuat…",
+            favorite = false,
+            onBack = onBack,
+            onToggleFavorite = {},
+            onShare = {},
+            onDelete = {},
+        )
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("Membuka vault…", color = Color.White.copy(alpha = 0.6f))
+        }
+    }
+}
+
+/**
+ * Resolves a routed id, distinguishing "index still loading" from "really
+ * missing". Returns null while either holds; renders the right placeholder
+ * screen and returns true when [onBack]-style bail-out UI took over.
+ */
+@Composable
+internal fun EntryGate(vm: VaultViewModel, id: Long, onBack: () -> Unit): FileEntity? {
+    val files by vm.allFiles.collectAsState()
+    val entry = files.firstOrNull { it.id == id }
+    if (entry != null) return entry
+    if (files.isEmpty()) EntryLoadingScreen(onBack) else MissingEntryScreen(onBack)
+    return null
+}
+
 // ------------------------------------------------------------- image viewer
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -117,6 +203,29 @@ fun ImageViewerScreen(vm: VaultViewModel, id: Long, onBack: () -> Unit) {
     val startIndex = images.indexOfFirst { it.id == id }.coerceAtLeast(0)
     val pagerState = rememberPagerState(initialPage = startIndex, pageCount = { images.size })
     var showInfo by remember { mutableStateOf(false) }
+    // Track the page actually being viewed so swipes also land in Recents.
+    RecordOpen(vm, images.getOrNull(pagerState.currentPage)?.id ?: id)
+
+    // First frame may still be empty: once the list arrives, jump to the
+    // tapped image instead of silently landing on item 0.
+    var jumped by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(images) {
+        if (!jumped && images.isNotEmpty()) {
+            jumped = true
+            val target = images.indexOfFirst { it.id == id }
+            if (target >= 0 && target != pagerState.currentPage) {
+                pagerState.scrollToPage(target)
+            }
+        }
+    }
+
+    // Deletions shrink the list; keep the pager inside bounds to avoid
+    // IndexOutOfBounds on the frame where the list changed.
+    androidx.compose.runtime.LaunchedEffect(images.size) {
+        if (images.isNotEmpty() && pagerState.currentPage >= images.size) {
+            pagerState.scrollToPage((images.size - 1).coerceAtLeast(0))
+        }
+    }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         Column(Modifier.fillMaxSize()) {
@@ -140,8 +249,8 @@ fun ImageViewerScreen(vm: VaultViewModel, id: Long, onBack: () -> Unit) {
                 Box(Modifier.fillMaxSize())
             } else {
                 HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-                    val entry = images[page]
-                    ZoomableImage(File(vm.repo.root, entry.relPath))
+                    val entry = images.getOrNull(page) ?: return@HorizontalPager
+                    ResolvedImage(vm = vm, relPath = entry.relPath, name = entry.name)
                 }
             }
         }
@@ -154,6 +263,26 @@ fun ImageViewerScreen(vm: VaultViewModel, id: Long, onBack: () -> Unit) {
     }
 }
 
+/** Resolves a (possibly encrypted) vault file to plaintext, then renders zoomable. */
+@Composable
+private fun ResolvedImage(vm: VaultViewModel, relPath: String, name: String) {
+    var file by remember(relPath) { mutableStateOf<File?>(null) }
+    androidx.compose.runtime.LaunchedEffect(relPath) {
+        file = vm.plainDisplayFile(relPath)
+    }
+    val resolved = file
+    if (resolved != null) {
+        ZoomableImage(resolved)
+    } else {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                "Tidak bisa membuka gambar",
+                color = Color.White.copy(alpha = 0.6f),
+            )
+        }
+    }
+}
+
 @Composable
 private fun ZoomableImage(file: File) {
     var scale by remember { mutableStateOf(1f) }
@@ -161,11 +290,9 @@ private fun ZoomableImage(file: File) {
     Box(
         Modifier
             .fillMaxSize()
-            .pointerInput(Unit) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    scale = (scale * zoom).coerceIn(1f, 6f)
-                    offset = if (scale > 1f) offset + pan else Offset.Zero
-                }
+            .twoFingerTransform { zoom, pan ->
+                scale = (scale * zoom).coerceIn(1f, 6f)
+                offset = if (scale > 1f) offset + pan else Offset.Zero
             },
         contentAlignment = Alignment.Center,
     ) {

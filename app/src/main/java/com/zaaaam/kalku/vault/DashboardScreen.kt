@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -93,6 +94,7 @@ fun DashboardScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackHost(vm) },
         topBar = {
             TopAppBar(
                 title = {
@@ -110,6 +112,21 @@ fun DashboardScreen(
                     }
                 },
                 actions = {
+                    // Secure Vault status badge — honest, driven by real state.
+                    val encryptedOn by vm.settings.encryptionEnabled.collectAsState(initial = false)
+                    val migrating by vm.migration.collectAsState()
+                    Icon(
+                        if (encryptedOn) Icons.Filled.Lock else Icons.Outlined.LockOpen,
+                        contentDescription = if (encryptedOn) "Terenkripsi" else "Plaintext",
+                        tint = if (encryptedOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.size(18.dp),
+                    )
+                    if (migrating is com.zaaaam.kalku.fs.VaultEncryptionMigrator.State.Running) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    }
                     IconButton(onClick = onLock) {
                         Icon(Icons.Default.Lock, contentDescription = "Lock", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -262,7 +279,9 @@ fun DashboardScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 14.dp)
-                        .height((rows * 88).dp),
+                        // 100dp/card: 88 clipped CategoryCardV4 content at larger
+                        // system font scales.
+                        .height((rows * 100).dp),
                     userScrollEnabled = false,
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -292,13 +311,15 @@ fun DashboardScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Column(Modifier.weight(1f)) {
+                            val autoLockMinutes by vm.settings.autoLockMinutes.collectAsState(initial = 5)
                             Text(
-                                "Brankas terkunci dalam 2 menit",
+                                if (autoLockMinutes > 0) "Brankas terkunci dalam $autoLockMinutes menit"
+                                else "Brankas terbuka sampai dikunci manual",
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.background,
                             )
                             Text(
-                                "Auto-lock aktif • Biometrik siap",
+                                if (autoLockMinutes > 0) "Auto-lock ${autoLockMinutes}m aktif" else "Auto-lock nonaktif",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.background.copy(alpha = 0.7f),
                             )

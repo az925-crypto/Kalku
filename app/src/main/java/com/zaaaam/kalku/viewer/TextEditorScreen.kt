@@ -48,8 +48,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -81,26 +79,55 @@ fun TextEditorScreen(
     parent: String,
     onBack: () -> Unit,
 ) {
-    val isNew = relPath.isEmpty()
-    val existing = if (!isNew) vm.byPathThenOpen(relPath) else null
+    // Tracks the actual save target: starts as the route arg and switches after
+    // a Save As, so subsequent saves update the same file instead of creating
+    // "name (2)" duplicates.
+    var savedPath by remember { mutableStateOf(relPath) }
+    val isNew = savedPath.isEmpty()
+    val existing = if (!isNew) vm.byPathThenOpen(savedPath) else null
     val settings by vm.settings.editorFontSize.collectAsState(initial = 14)
     val wordWrap by vm.settings.editorWordWrap.collectAsState(initial = true)
     val lineNumbersOn by vm.settings.editorLineNumbers.collectAsState(initial = true)
 
     var content by remember { mutableStateOf("") }
     var loaded by remember { mutableStateOf(isNew) }
+    // Distinguishes "loaded as empty" from "load failed": a failed load must
+    // never let one Save click overwrite a good file with an empty string.
+    var loadFailed by remember { mutableStateOf(false) }
     var dirty by remember { mutableStateOf(false) }
     var currentName by remember { mutableStateOf(existing?.name ?: "note.txt") }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
 
-    LaunchedEffect(relPath) {
+    LaunchedEffect(savedPath) {
         if (!isNew) {
             val text = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                vm.readTextSafe(relPath)
-            }.orEmpty()
-            content = text
+                vm.readTextSafe(savedPath)
+            }
+            if (text == null) {
+                loadFailed = true
+                content = ""
+            } else {
+                loadFailed = false
+                content = text
+            }
         }
         loaded = true
     }
+
+    // Header check for the status line, off the main thread.
+    var isEncrypted by remember(savedPath) { mutableStateOf(false) }
+    LaunchedEffect(savedPath) {
+        if (!isNew) {
+            isEncrypted = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                vm.isPathEncrypted(savedPath)
+            }
+        }
+    }
+
+    // Binary content (NUL byte) means this file was routed here by mistake;
+    // saving would write lossy mojibake over the original. Hard-block saves.
+    val binaryBlocked = remember(loaded, content) { loaded && !isNew && content.contains('\u0000') }
+    val saveBlocked = !loaded || loadFailed || binaryBlocked
 
     var undoStack by remember { mutableStateOf(listOf<String>()) }
     var redoStack by remember { mutableStateOf(listOf<String>()) }
@@ -136,22 +163,38 @@ fun TextEditorScreen(
     var exitDirtyConfirm by remember { mutableStateOf(false) }
 
     val lineCount = remember(content) { maxOf(content.lines().size, 1) }
-    // HTML demo highlights line 4 (index 3) as current; in real use this would follow cursor.
-    val curLineIndex = remember(content, lineCount) { if (lineCount >= 4) 3 else 0 }
     val wordCount = remember(content) { content.split(' ', '\n').count { it.isNotBlank() } }
     val editorStats = remember(content) { "$lineCount baris · $wordCount kata" }
 
-    fun saveTo(path: String, name: String) {
-        vm.writeTextSafe(path, content)
-        dirty = false
+    // System back must respect the dirty guard too — without this a swipe
+    // discarded changes with no confirmation dialog.
+    androidx.activity.compose.BackHandler(enabled = dirty) { exitDirtyConfirm = true }
+
+    /** Persists [content]; dirty flag only clears when the write actually succeeded. */
+    fun saveTo(path: String) {
+        if (saveBlocked) return
+        scope.launch {
+            val ok = vm.writeTextSafe(path, content)
+            if (ok) dirty = false
+        }
     }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .background(MaterialTheme.colorScheme.background),
-    ) {
+    // Toast pipeline: save/conflict errors must be visible inside the editor.
+    val toastEvent by vm.toast.collectAsState()
+    val snackState = remember { androidx.compose.material3.SnackbarHostState() }
+    LaunchedEffect(toastEvent?.id) {
+        toastEvent?.let {
+            snackState.showSnackbar(it.msg)
+            vm.dismissToast()
+        }
+    }
+
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding(),
+        ) {
         // .ed-bar / .topbar 64dp — HTML: padding 12 14 10 gap2 + border-bottom line2
         TopAppBar(
             title = {
@@ -174,7 +217,13 @@ fun TextEditorScreen(
                         )
                     }
                     Text(
-                        if (isNew) "Baru · belum disimpan" else "Tersembunyi · dienkripsi",
+                        when {
+                            isNew -> "Baru · belum disimpan"
+                            loadFailed -> "Gagal memuat — simpan dinonaktifkan"
+                            binaryBlocked -> "File biner — simpan dinonaktifkan"
+                            isEncrypted -> "Terenkripsi · AES-GCM"
+                            else -> "Plaintext · di device",
+                        },
                         style = TextStyle(
                             fontFamily = MonoNumbers,
                             fontSize = 10.5.sp,
@@ -193,14 +242,18 @@ fun TextEditorScreen(
                 IconButton(onClick = { undo() }, enabled = undoStack.isNotEmpty()) { Icon(Icons.Default.Undo, "Undo", tint = if (undoStack.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)) }
                 IconButton(onClick = { redo() }, enabled = redoStack.isNotEmpty()) { Icon(Icons.Default.Redo, "Redo", tint = if (redoStack.isNotEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)) }
                 IconButton(onClick = { showFind = true }) { Icon(Icons.Default.Search, "Find", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
-                IconButton(onClick = {
-                    if (!isNew && existing != null) saveTo(relPath, currentName)
-                    else showSaveAs = true
-                }) {
+                IconButton(
+                    onClick = {
+                        if (!isNew && existing != null) saveTo(savedPath)
+                        else showSaveAs = true
+                    },
+                    enabled = !saveBlocked,
+                ) {
                     Icon(
                         Icons.Default.Save,
                         "Save",
-                        tint = MaterialTheme.colorScheme.primary, // HTML save brass/vermillion/ember tonal
+                        tint = if (saveBlocked) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                               else MaterialTheme.colorScheme.primary, // HTML save brass/vermillion/ember tonal
                     )
                 }
             },
@@ -227,8 +280,9 @@ fun TextEditorScreen(
             // Simpan — primary pill like HTML .tool.primary (ember/copper)
             androidx.compose.material3.Button(
                 onClick = {
-                    if (!isNew && existing != null) saveTo(relPath, currentName) else showSaveAs = true
+                    if (!isNew && existing != null) saveTo(savedPath) else showSaveAs = true
                 },
+                enabled = !saveBlocked,
                 shape = RoundedCornerShape(999.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 0.dp),
                 modifier = Modifier.height(32.dp),
@@ -267,13 +321,6 @@ fun TextEditorScreen(
                 }
             }
             Spacer(Modifier.weight(1f))
-            Text(
-                "Otomatis simpan • on",
-                fontFamily = MonoNumbers,
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                modifier = Modifier.padding(end = 8.dp),
-            )
         }
 
         val scroll = rememberScrollState()
@@ -296,13 +343,9 @@ fun TextEditorScreen(
                     horizontalAlignment = Alignment.End,
                 ) {
                     repeat(lineCount) { i ->
-                        val isCur = i == curLineIndex
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(
-                                    if (isCur) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else Color.Transparent,
-                                )
                                 .padding(end = 10.dp, top = 0.dp, bottom = 0.dp),
                             contentAlignment = Alignment.CenterEnd,
                         ) {
@@ -311,43 +354,22 @@ fun TextEditorScreen(
                                 fontSize = 11.5.sp, // HTML v4/v5 11.5px /20px ; v1/v2 12.5px
                                 lineHeight = (settings * 1.75f).sp, // HTML 1.75
                                 fontFamily = MonoNumbers,
-                                fontWeight = if (isCur) FontWeight.Medium else FontWeight.Normal,
-                                color = if (isCur) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
                                 modifier = Modifier.padding(end = 0.dp),
                             )
                         }
                     }
                 }
             }
-            // .code flex1 padding 14 14, Mono 12.5sp line 1.75, curline bg primary 0.06 + left 2dp
+            // .code flex1 padding 14 14, Mono 12.5sp line 1.75
             val hScroll = rememberScrollState()
-            val lineHdp = (settings * 1.75f).dp
             val primary = MaterialTheme.colorScheme.primary
-            val primaryWash = primary.copy(alpha = 0.06f)
             Box(
                 Modifier
                     .weight(1f)
                     .fillMaxHeight()
                     .background(MaterialTheme.colorScheme.surface),
             ) {
-                // curline wash + left 2dp — HTML .curline{background:rgba(..., .06); border-left:2px solid vermillion/ember} 1:1
-                if (lineCount > 0) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(lineHdp)
-                            .padding(top = 10.dp + lineHdp * curLineIndex.toFloat())
-                            .background(primaryWash)
-                            .drawBehind {
-                                drawLine(
-                                    color = primary,
-                                    start = Offset(0f, 0f),
-                                    end = Offset(0f, size.height),
-                                    strokeWidth = 2.dp.toPx(),
-                                )
-                            },
-                    )
-                }
                 SelectionContainer(Modifier.fillMaxSize()) {
                     OutlinedTextField(
                         value = content,
@@ -411,6 +433,14 @@ fun TextEditorScreen(
         }
     }
 
+        androidx.compose.material3.SnackbarHost(
+            hostState = snackState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 24.dp),
+        )
+    }
+
     if (showFind) {
         FindReplaceDialog(
             initialText = content,
@@ -427,8 +457,11 @@ fun TextEditorScreen(
             confirmText = "Save",
             onDismiss = { showSaveAs = false },
             onConfirm = { name ->
-                vm.saveTextAs(parent, name, content) { _ ->
-                    currentName = name.substringAfterLast('/')
+                vm.saveTextAs(parent, name, content) { entity ->
+                    // Adopt the new path so the next save updates this file
+                    // instead of prompting Save As again.
+                    savedPath = entity.relPath
+                    currentName = entity.name
                     dirty = false
                 }
                 showSaveAs = false

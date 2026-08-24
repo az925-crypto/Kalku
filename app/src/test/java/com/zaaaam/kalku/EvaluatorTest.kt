@@ -47,6 +47,19 @@ class EvaluatorTest {
         assertEquals(2.0, value("5%3"), 1e-9)
     }
 
+    @Test fun percentVersusModuloDisambiguation() {
+        // '%' followed by +/- binds as postfix percent (calculator convention),
+        // NOT as binary modulo — "10%+5" used to evaluate to 10 mod 5 == 0.
+        assertEquals(5.1, value("10%+5"), 1e-9)
+        assertEquals(-19.5, value("50%-20"), 1e-9)
+        // Parenthesised operand still means modulo.
+        assertEquals(0.0, value("5%(2+3)"), 1e-9)
+        assertEquals(4.0, value("10%(3+3)"), 1e-9)
+        // Negative-divisor modulo remains reachable via mod(a,b).
+        // Java/Kotlin remainder: sign follows the dividend → 10 % -3 == 1.
+        assertEquals(1.0, value("mod(10,-3)"), 1e-9)
+    }
+
     @Test fun factorial() {
         assertEquals(120.0, value("5!"), 1e-9)
         assertEquals(1.0, value("0!"), 1e-9)

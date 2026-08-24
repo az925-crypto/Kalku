@@ -12,12 +12,16 @@ sealed class EvalResult {
  *
  * Grammar (highest binding last):
  *   expression := addSub
- *   addSub     := mulDiv (('+' | '-') mulDiv)*
- *   mulDiv     := unary (('*' | '/' | '%') unary)*      // '%' binary = modulo when followed by a value
+ *   addSub     := mulDiv (('+' | '-') mulDiv)*      // '%' on rhs = relative percent: a + b% == a + a*b/100
+ *   mulDiv     := unary (('*' | '/') unary)*
  *   unary      := ('-' | '+') unary | pow
- *   pow        := postfix ('^' unary)?                  // right associative, -2^2 == -(2^2)
- *   postfix    := primary (('!' | '%'))*                // '%' postfix = value / 100
- *   primary    := NUMBER | CONSTANT | FUNC '(' args ')' | '(' expression ')'
+ *   pow        := postfix ('^' unary)?              // right associative, -2^2 == -(2^2)
+ *   postfix    := primary (('!' | '%'))*
+ *
+ * '%' disambiguation: modulo ONLY when the next token starts an unsigned operand
+ * (NUMBER, IDENTIFIER or '('). If it follows '+'/'-', '%' binds as postfix percent,
+ * so "10%+5" == 0.1 + 5 and "50%-20" == 0.5 - 20 (calculator convention).
+ * Negative-divisor modulo stays reachable via mod(a, b).
  */
 object Evaluator {
 
@@ -156,7 +160,7 @@ object Evaluator {
         }
 
         private fun startsValue(tok: Tok?): Boolean = tok is Tok.Num || tok is Tok.Id ||
-            (tok is Tok.Op && (tok.ch == '(' || tok.ch == '-' || tok.ch == '+'))
+            (tok is Tok.Op && tok.ch == '(')
 
         private fun unary(): Double {
             // Each operand consumption resets the percent marker; postfix may set it again.

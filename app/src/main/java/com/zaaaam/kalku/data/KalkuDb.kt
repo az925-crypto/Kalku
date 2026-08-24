@@ -103,9 +103,6 @@ interface FileDao {
     @androidx.room.Query("UPDATE files SET relPath = :newPath, parent = :newParent, name = :newName WHERE id = :id")
     suspend fun repathEntry(id: Long, newPath: String, newParent: String, newName: String)
 
-    @androidx.room.Query("UPDATE files SET relPath = :newPath WHERE relPath = :oldPath")
-    suspend fun repath(oldPath: String, newPath: String)
-
     @Query("UPDATE files SET size = :size, modifiedAt = :modifiedAt WHERE relPath = :relPath")
     suspend fun updateStat(relPath: String, size: Long, modifiedAt: Long)
 
@@ -126,6 +123,10 @@ interface FileDao {
 
     @Query("DELETE FROM files WHERE relPath = :relPath OR relPath LIKE :prefix || '/%' ESCAPE '\\'")
     suspend fun deleteTree(relPath: String, prefix: String)
+
+    /** Like [deleteTree] but never touches live rows (legacy trash rows whose path was reused). */
+    @Query("DELETE FROM files WHERE deleted = 1 AND (relPath = :relPath OR relPath LIKE :prefix || '/%' ESCAPE '\\')")
+    suspend fun deleteTreeIfDeleted(relPath: String, prefix: String)
 
     @Query("SELECT * FROM files WHERE deleted = 0 AND favorite = 1 ORDER BY name COLLATE NOCASE ASC")
     fun observeFavorites(): Flow<List<FileEntity>>

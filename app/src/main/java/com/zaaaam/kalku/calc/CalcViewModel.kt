@@ -17,13 +17,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Default secret used on a fresh install; user must personalize it on first entry. */
 const val DEFAULT_PIN = "1234"
 
 sealed interface UnlockSignal {
-    /** Secret matched an existing PIN. */
-    data object Enter : UnlockSignal
+    /** Secret matched an existing PIN; carries it for session/key unlocking. */
+    data class Enter(val pin: String) : UnlockSignal
 
     /** Default secret hit but no PIN configured yet — run first-time setup. */
     data object Setup : UnlockSignal
@@ -84,7 +85,7 @@ class CalcViewModel(app: Application) : AndroidViewModel(app) {
             "." -> {
                 if (last?.isDigit() != true) {
                     if (cur.endsWith(".")) return
-                    expression = cur + if (last?.isLetterOrDigit() == true) "" else if (cur.isEmpty()) "0." else "0."
+                    expression = cur + if (last?.isLetterOrDigit() == true) "" else "0."
                 } else {
                     val numStart = cur.indexOfLast { !it.isDigit() && it != '.' } + 1
                     if (cur.substring(numStart).contains('.')) return
@@ -140,50 +141,62 @@ class CalcViewModel(app: Application) : AndroidViewModel(app) {
         val expr = expression.trim()
         if (expr.isEmpty()) return
         viewModelScope.launch {
-            val looksLikeSecret = expr.all { it.isDigit() } && expr.length in 4..16
+            // Single-flight: spamming '=' must not stack parallel attempts that
+            // share one failedAttempts counter (double-counted, split backoff).
+            if (!pinCheckMutex.tryLock()) return@launch
+            try {
+                val looksLikeSecret = expr.all { it.isDigit() } && expr.length in 4..16
 
-            // Exponential-ish backoff on repeated failed secret attempts (in-memory).
-            val backoffMs = if (failedAttempts >= 3) minOf((failedAttempts - 2) * 5_000L, 30_000L) else 0L
-            if (backoffMs > 0) kotlinx.coroutines.delay(backoffMs)
+                if (looksLikeSecret) {
+                    // Backoff applies only to secret-shaped input; plain calculations
+                    // must never be delayed by failed PIN attempts.
+                    val backoffMs = if (failedAttempts >= 3) minOf((failedAttempts - 2) * 5_000L, 30_000L) else 0L
+                    if (backoffMs > 0) kotlinx.coroutines.delay(backoffMs)
 
-            val storedHash = settings.currentPinHash()
-            val matchesStored = !storedHash.isNullOrBlank() && PinHasher.verify(expr, storedHash)
-            val matchesFresh = storedHash.isNullOrBlank() && expr == DEFAULT_PIN
-            if (matchesStored || matchesFresh) {
-                failedAttempts = 0
-                clearAll()
-                unlockSignal.value = if (matchesFresh) UnlockSignal.Setup else UnlockSignal.Enter
-                return@launch
-            }
-            if (looksLikeSecret) {
-                failedAttempts++
-            }
-
-            when (val r = Evaluator.evaluate(expr, angleMode, precisionState.value)) {
-                is EvalResult.Value -> {
-                    // Plausible-secret inputs evaluate silently: the camouflage
-                    // stays believable but guesses never leak into history.
-                    if (!looksLikeSecret) {
-                        c.db.calcHistoryDao().insert(
-                            CalcHistoryEntity(
-                                expression = expr,
-                                result = r.formatted,
-                                timestamp = System.currentTimeMillis(),
-                            )
-                        )
+                    val storedHash = settings.currentPinHash()
+                    val matchesStored = !storedHash.isNullOrBlank() && withContext(kotlinx.coroutines.Dispatchers.Default) {
+                        PinHasher.verify(expr, storedHash)
                     }
-                    expression = r.formatted
-                    justEvaluated = true
+                    val matchesFresh = storedHash.isNullOrBlank() && expr == DEFAULT_PIN
+                    if (matchesStored || matchesFresh) {
+                        failedAttempts = 0
+                        clearAll()
+                        unlockSignal.value =
+                            if (matchesFresh) UnlockSignal.Setup else UnlockSignal.Enter(expr)
+                        return@launch
+                    }
+                    failedAttempts++
                 }
-                is EvalResult.Error -> {
-                    expression = ""
-                    justEvaluated = true
+
+                when (val r = Evaluator.evaluate(expr, angleMode, precisionState.value)) {
+                    is EvalResult.Value -> {
+                        // Plausible-secret inputs evaluate silently: the camouflage
+                        // stays believable but guesses never leak into history.
+                        if (!looksLikeSecret) {
+                            c.db.calcHistoryDao().insert(
+                                CalcHistoryEntity(
+                                    expression = expr,
+                                    result = r.formatted,
+                                    timestamp = System.currentTimeMillis(),
+                                )
+                            )
+                        }
+                        expression = r.formatted
+                        justEvaluated = true
+                    }
+                    is EvalResult.Error -> {
+                        expression = ""
+                        justEvaluated = true
+                    }
                 }
+            } finally {
+                pinCheckMutex.unlock()
             }
         }
     }
 
     private var failedAttempts = 0
+    private val pinCheckMutex = kotlinx.coroutines.sync.Mutex()
 
     fun clearHistory() = viewModelScope.launch { c.db.calcHistoryDao().clear() }
 }

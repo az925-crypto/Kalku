@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -55,7 +57,7 @@ private enum class KeyRole { DIGIT, OP, UTIL, CLEAR, EQUALS }
 fun CalculatorScreen(
     vm: CalcViewModel,
     hapticsEnabled: Boolean,
-    onUnlocked: (setupNeeded: Boolean) -> Unit,
+    onUnlocked: (UnlockSignal) -> Unit,
 ) {
     val history by vm.history.collectAsState()
     val unlock by vm.unlockSignal.collectAsState()
@@ -66,8 +68,8 @@ fun CalculatorScreen(
 
     LaunchedEffect(unlock) {
         when (val s = unlock) {
-            is UnlockSignal.Enter -> { vm.consumeUnlock(); onUnlocked(false) }
-            is UnlockSignal.Setup -> { vm.consumeUnlock(); onUnlocked(true) }
+            is UnlockSignal.Enter -> { vm.consumeUnlock(); onUnlocked(s) }
+            is UnlockSignal.Setup -> { vm.consumeUnlock(); onUnlocked(s) }
             null -> {}
         }
     }
@@ -262,27 +264,34 @@ private fun HistorySheet(
         if (items.isEmpty()) {
             Text("Belum ada perhitungan", color = MaterialTheme.colorScheme.outline)
         }
-        items.forEach { item ->
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .clickable { onPick(item) }
-                    .padding(vertical = 8.dp),
-            ) {
-                Text(
-                    item.expression,
-                    fontSize = 13.sp,
-                    fontFamily = MonoNumbers,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    "= ${item.result}",
-                    fontSize = 17.sp,
-                    fontFamily = MonoNumbers,
-                )
+        androidx.compose.foundation.lazy.LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 420.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp),
+        ) {
+            items(items, key = { it.id }) { item ->
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { onPick(item) }
+                        .padding(vertical = 8.dp),
+                ) {
+                    Text(
+                        item.expression,
+                        fontSize = 13.sp,
+                        fontFamily = MonoNumbers,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        "= ${item.result}",
+                        fontSize = 17.sp,
+                        fontFamily = MonoNumbers,
+                    )
+                }
             }
         }
-        Spacer(Modifier.height(24.dp))
     }
 }
 

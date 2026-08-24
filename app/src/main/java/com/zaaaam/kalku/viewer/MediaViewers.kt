@@ -45,6 +45,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.zaaaam.kalku.core.Format
+import com.zaaaam.kalku.data.FileEntity
 import com.zaaaam.kalku.vault.VaultViewModel
 import java.io.File
 
@@ -55,25 +56,43 @@ private val SPEEDS = listOf(0.5f, 1f, 1.5f, 2f)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VideoPlayerScreen(vm: VaultViewModel, id: Long, onBack: () -> Unit) {
-    val entry = entryOrNull(vm, id)
+    val entry = EntryGate(vm, id, onBack)
     val context = LocalContext.current
 
     if (entry == null) {
-        Box(Modifier.fillMaxSize().background(Color.Black))
         return
     }
 
-    val player = remember(entry.id) {
-        ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(File(vm.repo.root, entry.relPath).toURI().toString()))
-            prepare()
-            playWhenReady = true
+    // Encrypted vault files need a decrypted copy before ExoPlayer can play.
+    var mediaFile by remember(entry.id) { mutableStateOf<File?>(null) }
+    androidx.compose.runtime.LaunchedEffect(entry.id) {
+        mediaFile = vm.plainDisplayFile(entry.relPath)
+    }
+
+    val player = mediaFile?.let { f ->
+        remember(f) {
+            ExoPlayer.Builder(context).build().apply {
+                setMediaItem(MediaItem.fromUri(f.toURI().toString()))
+                prepare()
+                playWhenReady = true
+            }
         }
     }
-    DisposableEffect(player) { onDispose { player.release() } }
+    DisposableEffect(player) { onDispose { player?.release() } }
+
+    if (mediaFile == null) {
+        Column(Modifier.fillMaxSize()) {
+            ViewerTopBar(title = entry.name, favorite = entry.favorite, onBack = onBack,
+                onToggleFavorite = { vm.toggleFavorite(entry) }, onShare = {}, onDelete = {})
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Membuka video…", color = Color.White.copy(alpha = 0.6f))
+            }
+        }
+        return
+    }
 
     var speedIdx by remember { mutableStateOf(1) }
-    LaunchedEffect(speedIdx) { player.setPlaybackSpeed(SPEEDS[speedIdx]) }
+    LaunchedEffect(speedIdx) { player!!.setPlaybackSpeed(SPEEDS[speedIdx]) }
     RecordOpen(vm, entry.id)
 
     Column(Modifier.fillMaxSize().background(Color.Black)) {
@@ -109,39 +128,88 @@ internal fun RecordOpen(vm: VaultViewModel, id: Long) {
 @Composable
 fun AudioPlayerScreen(vm: VaultViewModel, id: Long, onBack: () -> Unit) {
     val allFiles by vm.allFiles.collectAsState()
+    val listLoaded = allFiles.isNotEmpty()
     val audios = remember(allFiles) {
         allFiles.filter { !it.isFolder && !it.deleted && it.category == "AUDIO" }.sortedBy { it.relPath }
     }
-    val startIndex = audios.indexOfFirst { it.id == id }
-    val entry = audios.getOrNull(startIndex)
 
-    if (entry == null || audios.isEmpty()) {
-        Box(Modifier.fillMaxSize())
+    // Tracks are resolved ONE at a time: pre-decrypting the entire playlist
+    // blocked the screen for seconds on encrypted libraries and thrashed the
+    // decrypted cache.
+    var currentIndex by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(-1) }
+    LaunchedEffect(audios) {
+        if (currentIndex == -1 && audios.isNotEmpty()) {
+            val found = audios.indexOfFirst { it.id == id }
+            if (found >= 0) currentIndex = found
+        }
+    }
+    if (currentIndex == -1) {
+        if (listLoaded && audios.none { it.id == id }) {
+            // Index fully loaded (or no audio at all): genuinely missing.
+            MissingEntryScreen(onBack)
+        } else {
+            EntryLoadingScreen(onBack)
+        }
         return
+    }
+    val entry = audios[currentIndex]
+
+    // Resolve plaintext only for the track that will actually play.
+    var currentFile by remember(entry.id) { mutableStateOf<File?>(null) }
+    LaunchedEffect(entry.id, entry.relPath) {
+        currentFile = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            vm.plainDisplayFile(entry.relPath)
+        }
     }
 
     val context = LocalContext.current
-    val player = remember(audios.map { it.id }) {
-        ExoPlayer.Builder(context).build().apply {
-            addMediaItems(audios.map { MediaItem.fromUri(File(vm.repo.root, it.relPath).toURI().toString()) })
-            seekTo(startIndex, 0)
-            prepare()
-            playWhenReady = false
+    val player = currentFile?.let { f ->
+        remember(f) {
+            ExoPlayer.Builder(context).build().apply {
+                setMediaItem(MediaItem.fromUri(f.toURI().toString()))
+                prepare()
+                playWhenReady = false
+            }
         }
     }
-    DisposableEffect(player) { onDispose { player.release() } }
+    DisposableEffect(player) { onDispose { player?.release() } }
+
+    if (player == null) {
+        Box(Modifier.fillMaxSize())
+        return
+    }
 
     var isPlaying by remember { mutableStateOf(false) }
     var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
     var loopAll by remember { mutableStateOf(true) }
     var speedIdx by remember { mutableStateOf(1) }
+    var shuffleOn by remember { mutableStateOf(player.shuffleModeEnabled) }
+    // Local drag state so the thumb follows the finger even while paused
+    // (the 500ms position poller only runs while playing).
+    var isSeeking by remember { mutableStateOf(false) }
+    var seekPos by remember { mutableLongStateOf(0L) }
+
+    fun jumpToRandom() {
+        if (audios.size <= 1) return
+        var n = currentIndex
+        while (n == currentIndex) n = kotlin.random.Random.nextInt(audios.size)
+        currentIndex = n
+    }
+    fun stepBy(delta: Int) {
+        if (audios.isEmpty()) return
+        currentIndex = (currentIndex + delta).mod(audios.size)
+    }
+    fun advanceTrack() = if (shuffleOn) jumpToRandom() else stepBy(1)
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(p: Boolean) { isPlaying = p }
             override fun onPlaybackStateChanged(state: Int) {
                 duration = if (state == Player.STATE_READY) player.duration.coerceAtLeast(0) else 0
+                // Playlist advance is manual (single-item media): on track end,
+                // loop-all moves to the next/shuffled entry, otherwise stop.
+                if (state == Player.STATE_ENDED && loopAll && audios.size > 1) advanceTrack()
             }
         }
         player.addListener(listener)
@@ -150,6 +218,14 @@ fun AudioPlayerScreen(vm: VaultViewModel, id: Long, onBack: () -> Unit) {
     LaunchedEffect(isPlaying) {
         while (isPlaying) {
             position = player.currentPosition.coerceAtLeast(0)
+            kotlinx.coroutines.delay(500)
+        }
+    }
+    // Keep the displayed position fresh when paused (e.g. right after a seek);
+    // bounded polling instead of an endless while(true).
+    LaunchedEffect(Unit) {
+        while (true) {
+            if (!isPlaying && !isSeeking) position = player.currentPosition.coerceAtLeast(0)
             kotlinx.coroutines.delay(500)
         }
     }
@@ -190,18 +266,26 @@ fun AudioPlayerScreen(vm: VaultViewModel, id: Long, onBack: () -> Unit) {
                     maxLines = 1,
                 )
                 Text(
-                    "${startIndex + 1} / ${audios.size}",
+                    "${currentIndex + 1} / ${audios.size}",
                     color = Color.White.copy(alpha = 0.6f),
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Slider(
-                    value = position.toFloat(),
-                    onValueChange = { player.seekTo(it.toLong()) },
+                    value = (if (isSeeking) seekPos else position).toFloat(),
+                    onValueChange = {
+                        isSeeking = true
+                        seekPos = it.toLong()
+                    },
+                    onValueChangeFinished = {
+                        player.seekTo(seekPos)
+                        position = seekPos
+                        isSeeking = false
+                    },
                     valueRange = 0f..(if (duration > 0) duration else 1f).toFloat(),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("${Format.millis(position)}", color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.bodySmall)
+                    Text("${Format.millis(if (isSeeking) seekPos else position)}", color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.bodySmall)
                     Text("${Format.millis(duration)}", color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.bodySmall)
                 }
             }
@@ -211,10 +295,10 @@ fun AudioPlayerScreen(vm: VaultViewModel, id: Long, onBack: () -> Unit) {
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = { loopAll = !loopAll; player.repeatMode = if (loopAll) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF }) {
+                IconButton(onClick = { loopAll = !loopAll }) {
                     Icon(if (loopAll) Icons.Default.Repeat else Icons.Default.RepeatOne, "Loop", tint = Color.White)
                 }
-                IconButton(onClick = { player.seekToPreviousMediaItem() }) {
+                IconButton(onClick = { if (shuffleOn) jumpToRandom() else stepBy(-1) }) {
                     Icon(Icons.Default.SkipPrevious, "Previous", tint = Color.White)
                 }
                 IconButton(onClick = { if (player.isPlaying) player.pause() else player.play() }) {
@@ -225,11 +309,19 @@ fun AudioPlayerScreen(vm: VaultViewModel, id: Long, onBack: () -> Unit) {
                         modifier = Modifier.padding(8.dp),
                     )
                 }
-                IconButton(onClick = { player.seekToNextMediaItem() }) {
+                IconButton(onClick = { advanceTrack() }) {
                     Icon(Icons.Default.SkipNext, "Next", tint = Color.White)
                 }
-                IconButton(onClick = { /* shuffle handled by playlist order */ }) {
-                    Icon(Icons.Default.Shuffle, "Shuffle", tint = Color.White.copy(alpha = 0.5f))
+                IconButton(onClick = {
+                    shuffleOn = !shuffleOn
+                    // ExoPlayer no longer owns the playlist; shuffle is manual.
+                    player.shuffleModeEnabled = false
+                }) {
+                    Icon(
+                        Icons.Default.Shuffle,
+                        "Shuffle",
+                        tint = if (shuffleOn) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.5f),
+                    )
                 }
             }
         }

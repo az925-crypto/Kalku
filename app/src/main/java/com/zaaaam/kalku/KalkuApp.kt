@@ -30,5 +30,16 @@ class Container(context: Context) {
 
     val settings by lazy { SettingsRepo(appContext) }
 
-    val repo by lazy { VaultRepo(appContext, db) }
+    val repo by lazy { VaultRepo(appContext, db, crypto) }
+
+    /** In-memory DEK holder for Secure Vault; one per process. */
+    val crypto by lazy { com.zaaaam.kalku.security.CryptoSession() }
+
+    /** Decrypted-view cache for viewers; wiped whenever the session locks. */
+    val decCache by lazy {
+        com.zaaaam.kalku.fs.DecryptedCacheManager(
+            repo, crypto,
+            java.io.File(appContext.cacheDir, "vault_dec"),
+        )
+    }
 }

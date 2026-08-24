@@ -6,13 +6,18 @@ import android.provider.OpenableColumns
 import com.zaaaam.kalku.core.Category
 import com.zaaaam.kalku.core.CategoryDetector
 import com.zaaaam.kalku.core.Names
+import com.zaaaam.kalku.core.crypto.VaultFileFormat
 import com.zaaaam.kalku.data.FileEntity
 import com.zaaaam.kalku.data.KalkuDatabase
 import com.zaaaam.kalku.data.RecentEntity
+import com.zaaaam.kalku.security.CryptoSession
 import java.io.BufferedInputStream
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.InputStream
+import java.io.SequenceInputStream
 
 /** Thrown when a vault operation fails; message is user-presentable. */
 class VaultException(message: String, cause: Throwable? = null) : Exception(message, cause)
@@ -23,10 +28,14 @@ fun join(parent: String, name: String): String = if (parent.isEmpty()) name else
  * Single facade for vault queries and structural mutations.
  * Physical files live under [VaultPaths]; Room keeps only metadata,
  * fully rebuildable via scan() (see VaultTrashOps / VaultIndexOps).
+ *
+ * When the session holds a Secure Vault DEK ([CryptoSession]), all writes are
+ * AES-GCM encrypted at rest and reads decrypt transparently.
  */
 class VaultRepo(
     val appContext: Context,
     internal val db: KalkuDatabase,
+    private val crypto: CryptoSession,
 ) {
     val fileDao get() = db.fileDao()
     internal fun trashDao() = db.trashDao()
@@ -34,6 +43,84 @@ class VaultRepo(
 
     val storage: VaultPaths.Storage by lazy { VaultPaths.resolve(context = appContext) }
     val root: File get() = storage.root
+
+    // --------------------------------------------------------------- crypto
+
+    /** True when this session can encrypt/decrypt (DEK loaded). */
+    fun isEncrypting(): Boolean = crypto.cipherOrNull() != null
+
+    /** Plaintext view of [f]; decrypts transparently, throws if locked+encrypted. */
+    fun plainStream(f: File): InputStream {
+        require(f.isFile) { "Not a readable file" }
+        if (!VaultFileFormat.isEncrypted(f)) return f.inputStream()
+        val cipher = crypto.cipherOrNull() ?: throw VaultException("File terenkripsi — buka vault untuk membuka")
+        return cipher.decryptedStream(f.inputStream().buffered())
+    }
+
+    /** Copies [source] into [outFile], encrypting when the session allows.
+     *  Refuses to silently downgrade an encrypted file to plaintext when the
+     *  session lost its key (e.g. auto-lock fired mid-edit). */
+    internal fun writeThrough(source: InputStream, outFile: File) {
+        val cipher = crypto.cipherOrNull()
+        if (cipher == null) {
+            if (outFile.exists() && VaultFileFormat.isEncrypted(outFile)) {
+                throw VaultException("Vault terkunci — buka PIN lagi sebelum menyimpan")
+            }
+            FileOutputStream(outFile).use { source.copyTo(it) }
+        } else {
+            FileOutputStream(outFile).use { cipher.encrypt(source.buffered(), it) }
+        }
+    }
+
+    private fun writeBytesEncrypted(f: File, data: ByteArray) {
+        writeThrough(ByteArrayInputStream(data), f)
+    }
+
+    /** First plaintext bytes of a vault file (decrypting when needed). */
+    internal fun plainHead(f: File): ByteArray = try {
+        plainStream(f).use { s ->
+            val buf = ByteArray(512)
+            val n = s.read(buf)
+            if (n > 0) buf.copyOf(n) else ByteArray(0)
+        }
+    } catch (_: Exception) {
+        ByteArray(0)
+    }
+
+    /**
+     * Copies [src] to [dst] through the encrypt pipeline while capturing the
+     * first plaintext bytes in the SAME pass — avoids decrypting the file twice
+     * (once for the category head, once for the body).
+     */
+    internal fun copyPlainCapturingHead(src: File, dst: File): ByteArray {
+        val head = ByteArray(512)
+        var headLen = 0
+        plainStream(src).use { input ->
+            while (headLen < head.size) {
+                val r = input.read(head, headLen, head.size - headLen)
+                if (r < 0) break
+                headLen += r
+            }
+            writeThrough(
+                SequenceInputStream(ByteArrayInputStream(head, 0, headLen), input),
+                dst,
+            )
+        }
+        return head.copyOf(headLen)
+    }
+
+    // ------------------------------------------------------------ cache sync
+
+    /** Notified with a vault relPath whenever its on-disk content changes identity. */
+    private val mutationListeners = mutableListOf<(String) -> Unit>()
+
+    fun addMutationListener(listener: (String) -> Unit) {
+        mutationListeners += listener
+    }
+
+    internal fun notifyMutated(relPath: String) {
+        mutationListeners.forEach { runCatching { it(relPath) } }
+    }
 
     // ------------------------------------------------------------------ paths
 
@@ -63,7 +150,7 @@ class VaultRepo(
     // -------------------------------------------------------------- lifecycle
 
     /** Creates root, trash, meta and the default folder layout + index rows for folders. */
-    suspend fun ensureStructure() {
+    suspend fun ensureStructure() = withContext(kotlinx.coroutines.Dispatchers.IO) {
         root.mkdirs()
         VaultPaths.trashDir(root).mkdirs()
         VaultPaths.metaDir(root).mkdirs()
@@ -121,25 +208,35 @@ class VaultRepo(
         val existing = destDir.list()?.toMutableSet() ?: mutableSetOf()
         val created = mutableListOf<String>()
         for (uri in uris) {
+            var createdName: String? = null
             try {
                 val rawName = Names.sanitizeFileName(displayNameOf(uri))
                 val name = Names.uniqueName(rawName, existing)
-                val outFile = File(destDir, name)
+                requireNotReserved(destParent, name)
+                val target = File(destDir, name)
+                createdName = name
                 val header = ByteArray(512)
                 var headerLen = 0
                 appContext.contentResolver.openInputStream(uri)?.use { input ->
                     headerLen = input.read(header)
-                    FileOutputStream(outFile).use { out ->
-                        if (headerLen > 0) out.write(header, 0, headerLen)
-                        input.copyTo(out)
-                    }
+                    if (headerLen < 0) headerLen = 0
+                    // Detection uses the plaintext head; the write pipeline may
+                    // then encrypt everything (header included).
+                    val body = SequenceInputStream(ByteArrayInputStream(header, 0, headerLen), input)
+                    writeThrough(body, target)
                 } ?: continue
-                requireNotReserved(destParent, name)
-                insertFileRow(outFile, destParent, header)
+                insertFileRow(target, destParent, header.copyOf(headerLen))
                 existing.add(name)
                 created.add(name)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // Cancellation must abort the whole import — swallowing it here
+                // would keep doing blocking I/O per URI and delete fresh work.
+                createdName?.let { File(destDir, it).delete() }
+                throw e
             } catch (_: Exception) {
-                // Skip unreadable provider entries but keep importing the rest.
+                // Skip unreadable provider entries but keep importing the rest;
+                // never leave half-written orphans behind for scan() to index.
+                createdName?.let { File(destDir, it).delete() }
             }
         }
         return created
@@ -152,8 +249,10 @@ class VaultRepo(
         val existing = destDir.list()?.toSet() ?: emptySet()
         val name = Names.uniqueName(Names.sanitizeFileName(src.name), existing)
         val outFile = File(destDir, name)
-        src.copyTo(outFile, overwrite = false)
-        insertFileRow(outFile, destParent, readHeader(outFile))
+        // Detect from the plaintext source BEFORE it gets encrypted on disk.
+        val srcHeader = readHeader(src)
+        writeThrough(src.inputStream().buffered(), outFile)
+        insertFileRow(outFile, destParent, srcHeader)
         return name
     }
 
@@ -204,7 +303,24 @@ class VaultRepo(
         val finalName = Names.uniqueName(name, siblings)
         requireNotReserved(parent, finalName)
         val f = File(fileOf(parent), finalName).also { assertInside(it) }
-        f.writeText(content)
+        writeBytesEncrypted(f, content.toByteArray(Charsets.UTF_8))
+        return textFileEntity(f, parent, finalName)
+    }
+
+    /**
+     * Like [createTextFile] but fails instead of uniquifying when the name is
+     * already taken — used by Save As so users never get surprise "(2)" copies.
+     */
+    suspend fun createTextFileExact(parent: String, rawName: String, content: String): FileEntity {
+        val finalName = Names.sanitizeFileName(rawName).ifEmpty { "untitled.txt" }
+        requireNotReserved(parent, finalName)
+        val f = File(fileOf(parent), finalName).also { assertInside(it) }
+        if (f.exists()) throw VaultException("Nama sudah dipakai")
+        writeBytesEncrypted(f, content.toByteArray(Charsets.UTF_8))
+        return textFileEntity(f, parent, finalName)
+    }
+
+    private suspend fun textFileEntity(f: File, parent: String, finalName: String): FileEntity {
         val cat = CategoryDetector.detect(finalName, null)
         val entity = FileEntity(
             relPath = join(parent, finalName),
@@ -238,11 +354,20 @@ class VaultRepo(
         val newPath = join(entry.parent, newName)
         fileDao.repathEntry(id, newPath, entry.parent, newName)
         if (entry.isFolder) repathDescendants(entry.relPath, newPath)
+        notifyMutated(entry.relPath)
     }
 
     private suspend fun repathDescendants(oldPrefix: String, newPrefix: String) {
         all().filter { it.relPath.startsWith("$oldPrefix/") }.forEach { row ->
-            fileDao.repath(row.relPath, newPrefix + row.relPath.removePrefix(oldPrefix))
+            val newRel = newPrefix + row.relPath.removePrefix(oldPrefix)
+            // Update relPath, parent AND name together — repathing only relPath
+            // leaves stale parent values and emptied folders behind.
+            fileDao.repathEntry(
+                row.id,
+                newRel,
+                newRel.substringBeforeLast('/', ""),
+                newRel.substringAfterLast('/'),
+            )
         }
     }
 
@@ -266,11 +391,21 @@ class VaultRepo(
             val newPath = join(destParent, finalName)
             fileDao.repathEntry(entry.id, newPath, destParent, finalName)
             if (entry.isFolder) repathDescendants(entry.relPath, newPath)
+            notifyMutated(entry.relPath)
         }
     }
 
     suspend fun copy(ids: List<Long>, destParent: String) {
         val destDir = fileOf(destParent).also { assertInside(it); it.mkdirs() }
+        // Same guard as move(): copying a folder into itself would make the
+        // walk consume its own output and duplicate recursively until the
+        // disk fills up.
+        for (id in ids) {
+            val entry = fileDao.byId(id) ?: continue
+            if (destParent == entry.relPath || destParent.startsWith(entry.relPath + "/")) {
+                throw VaultException("Cannot copy folder into itself")
+            }
+        }
         var taken = destDir.list()?.toSet() ?: emptySet()
         for (id in ids) {
             val entry = fileDao.byId(id) ?: continue
@@ -281,28 +416,62 @@ class VaultRepo(
             requireNotReserved(destParent, finalName)
             val target = File(destDir, finalName).also { assertInside(it) }
             if (entry.isFolder) {
+                // Heads captured during the copy pass — no second decryption.
+                val heads = mutableMapOf<String, ByteArray>()
                 src.walkTopDown().forEach { f ->
-                    val dst = File(target, f.relativeTo(src).path)
-                    if (f.isDirectory) dst.mkdirs() else f.copyTo(dst, overwrite = true)
+                    val rel = f.relativeTo(src).path
+                    val dst = File(target, rel)
+                    // plainStream decrypts encrypted sources so the copy is a
+                    // fresh plaintext → (re)encrypt pass, never blob-of-blob.
+                    if (f.isDirectory) dst.mkdirs() else heads[rel] = copyPlainCapturingHead(f, dst)
                 }
                 fileDao.upsert(folderEntity(join(destParent, finalName), destParent))
-                indexTreeUnder(target, join(destParent, finalName))
+                indexTreeUnder(target, join(destParent, finalName), heads)
             } else {
-                src.copyTo(target, overwrite = true)
-                insertFileRow(target, destParent, readHeader(target))
+                val head = copyPlainCapturingHead(src, target)
+                insertFileRow(target, destParent, head)
             }
         }
     }
 
     /** Indexes everything below an already-copied folder on disk. */
-    internal suspend fun indexTreeUnder(dirOnDisk: File, dirRel: String) {
+    internal suspend fun indexTreeUnder(
+        dirOnDisk: File,
+        dirRel: String,
+        capturedHeads: Map<String, ByteArray> = emptyMap(),
+    ) {
         dirOnDisk.listFiles()?.sortedBy { it.name }?.forEach { f ->
             val rel = join(dirRel, f.name)
             if (f.isDirectory) {
                 fileDao.upsert(folderEntity(rel, dirRel))
-                indexTreeUnder(f, rel)
+                indexTreeUnder(f, rel, capturedHeads)
             } else {
-                insertFileRow(f, dirRel, readHeader(f))
+                // Prefer a head captured during the copy pass; fall back to a
+                // fresh decrypt for trees that were not just copied.
+                val head = capturedHeads[f.relativeToOrNull(dirOnDisk)?.path]
+                    ?: plainHead(f)
+                insertFileRow(f, dirRel, head)
+            }
+        }
+    }
+
+    /**
+     * Imports a plaintext [srcDir] tree into [destRel] (creating folder rows),
+     * routing every file through the normal import pipeline so encryption and
+     * sizes are handled consistently.
+     */
+    suspend fun importTree(srcDir: File, destRel: String) {
+        fileOf(destRel).also { it.mkdirs(); assertInside(it) }
+        if (fileDao.byPath(destRel) == null) {
+            fileDao.upsert(folderEntity(destRel, destRel.substringBeforeLast('/', "")))
+        }
+        srcDir.listFiles()?.sortedBy { it.name.lowercase() }?.forEach { f ->
+            if (f.isDirectory) {
+                val childRel = join(destRel, f.name)
+                fileDao.upsert(folderEntity(childRel, destRel))
+                importTree(f, childRel)
+            } else {
+                importLocalFile(f, destRel)
             }
         }
     }

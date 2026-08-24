@@ -1,6 +1,7 @@
 package com.zaaaam.kalku.vault
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -284,6 +285,7 @@ fun FavoritesScreen(vm: VaultViewModel, onBack: () -> Unit, onOpenFile: (FileEnt
 fun TrashScreen(vm: VaultViewModel, onBack: () -> Unit) {
     val items by vm.trashItems.collectAsState()
     var confirmEmpty by remember { mutableStateOf(false) }
+    var confirmDeleteId by remember { mutableStateOf<Long?>(null) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -332,7 +334,7 @@ fun TrashScreen(vm: VaultViewModel, onBack: () -> Unit) {
                             trailingContent = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     IconButton(onClick = { vm.restore(t.id) }) { Icon(Icons.Default.Restore, "Restore", tint = MaterialTheme.colorScheme.primary) }
-                                    IconButton(onClick = { vm.permanentDelete(t.id) }) {
+                                    IconButton(onClick = { confirmDeleteId = t.id }) {
                                         Icon(Icons.Default.DeleteForever, "Delete forever", tint = MaterialTheme.colorScheme.error)
                                     }
                                 }
@@ -355,6 +357,21 @@ fun TrashScreen(vm: VaultViewModel, onBack: () -> Unit) {
             onConfirm = { confirmEmpty = false; vm.emptyTrash() },
         )
     }
+
+    confirmDeleteId?.let { id ->
+        val target = items.firstOrNull { it.id == id }
+        ConfirmDialog(
+            title = "Hapus permanen?",
+            message = "\"${target?.name ?: "Item ini"}\" akan dihapus permanen dan tidak bisa dipulihkan.",
+            confirmText = "Hapus permanen",
+            destructive = true,
+            onDismiss = { confirmDeleteId = null },
+            onConfirm = {
+                confirmDeleteId = null
+                vm.permanentDelete(id)
+            },
+        )
+    }
 }
 
 // ------------------------------------------------------------------ gallery
@@ -364,7 +381,7 @@ fun TrashScreen(vm: VaultViewModel, onBack: () -> Unit) {
 fun GalleryScreen(
     vm: VaultViewModel,
     onBack: () -> Unit,
-    onOpenImage: (Int) -> Unit,
+    onOpenImage: (Long) -> Unit,
 ) {
     val images by vm.images.collectAsState()
     Scaffold(
@@ -380,28 +397,46 @@ fun GalleryScreen(
         if (images.isEmpty()) {
             EmptyState("Belum ada gambar", Icons.Default.Image, Modifier.padding(padding).fillMaxSize())
         } else {
-            val indexedImages = remember(images) { images.withIndex().toList() }
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 modifier = Modifier.padding(padding).padding(horizontal = 14.dp, vertical = 10.dp).fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                items(indexedImages, key = { it.value.id }) { (index, img) ->
+                items(images, key = { it.id }) { img ->
                     Card(
                         shape = RoundedCornerShape(18.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                        modifier = Modifier.clickable { onOpenImage(index) },
+                        // Pass the id, not the index: the backing list can reorder
+                        // (rescan) between render and tap.
+                        modifier = Modifier.clickable { onOpenImage(img.id) },
                     ) {
-                        AsyncImage(
-                            model = File(vm.repo.root, img.relPath),
-                            contentDescription = img.name,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(140.dp)
-                                .clip(RoundedCornerShape(18.dp)),
-                        )
+                        val thumbFile by androidx.compose.runtime.produceState<File?>(
+                            initialValue = null,
+                            key1 = img.id,
+                        ) {
+                            value = vm.plainDisplayFile(img.relPath)
+                        }
+                        if (thumbFile != null) {
+                            AsyncImage(
+                                model = thumbFile,
+                                contentDescription = img.name,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(140.dp)
+                                    .clip(RoundedCornerShape(18.dp)),
+                            )
+                        } else {
+                            Box(
+                                Modifier.fillMaxWidth().height(140.dp)
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(iconFor(false, img.category), null, tint = categoryColor(img.category))
+                            }
+                        }
                     }
                 }
             }

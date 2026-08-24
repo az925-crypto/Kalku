@@ -102,6 +102,14 @@ fun SettingsScreen(
     var showChangePin by remember { mutableStateOf(false) }
     var showReindexConfirm by remember { mutableStateOf(false) }
 
+    // Secure Vault
+    val encryptionEnabled by s.encryptionEnabled.collectAsState(initial = false)
+    val migration by vm.migration.collectAsState()
+    val unencryptedPending by vm.unencryptedPending.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(Unit) { vm.refreshUnencryptedPending() }
+    var showDecryptAllConfirm by remember { mutableStateOf(false) }
+    var showEnablePinPrompt by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -212,10 +220,64 @@ fun SettingsScreen(
                         )
                     },
                 )
+            }
+
+            // ── Enkripsi (Secure Vault)
+            SecLabel("Enkripsi")
+            SettingsCard {
                 SRow(
-                    label = "Biometrik",
-                    hint = "Sidik jari sebagai alternatif",
-                    trailing = { KalkuSwitch(checked = false, onCheckedChange = {}) }, // placeholder — logic kept in viewmodel if needed; HTML toggle off
+                    label = "Secure Vault",
+                    hint = "Enkripsi at-rest AES-GCM — kunci diturunkan dari PIN",
+                    trailing = {
+                        KalkuSwitch(
+                            checked = encryptionEnabled,
+                            enabled = migration !is com.zaaaam.kalku.fs.VaultEncryptionMigrator.State.Running,
+                            onCheckedChange = { want ->
+                                when {
+                                    !want -> showDecryptAllConfirm = true
+                                    // Legacy plaintext vault: DEK must be wrapped under a PIN.
+                                    !vm.cryptoActive() -> showEnablePinPrompt = true
+                                    else -> vm.toggleEncryption(true)
+                                }
+                            },
+                        )
+                    },
+                )
+                // Status row — honest per state.
+                Box(Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 8.dp)) {
+                    val statusText = when (val m = migration) {
+                        is com.zaaaam.kalku.fs.VaultEncryptionMigrator.State.Running ->
+                            "Migrasi berjalan… ${m.done}/${m.total} · ${m.currentName.ifEmpty { "-" }}"
+                        is com.zaaaam.kalku.fs.VaultEncryptionMigrator.State.Paused ->
+                            "Dijeda (${m.done}/${m.total})"
+                        is com.zaaaam.kalku.fs.VaultEncryptionMigrator.State.Failed ->
+                            "Gagal: ${m.message}"
+                        else ->
+                            if (encryptionEnabled) {
+                                when {
+                                    unencryptedPending > 0 -> "Terenkripsi sebagian • $unencryptedPending file plaintext"
+                                    else -> "Terenkripsi"
+                                }
+                            } else "Plaintext • file terbaca via file manager"
+                    }
+                    Text(
+                        statusText,
+                        fontFamily = MonoNumbers,
+                        fontSize = 10.5.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                        maxLines = 2,
+                    )
+                }
+                if (migration is com.zaaaam.kalku.fs.VaultEncryptionMigrator.State.Paused ||
+                    (encryptionEnabled && unencryptedPending > 0 && migration is com.zaaaam.kalku.fs.VaultEncryptionMigrator.State.Idle)
+                ) {
+                    TextButton(
+                        onClick = { vm.resumeMigration() },
+                        modifier = Modifier.padding(horizontal = 15.dp).padding(bottom = 8.dp),
+                    ) { Text("Lanjutkan migrasi") }
+                }
+                WarnBox(
+                    text = "⚠ Lupa PIN = file tidak bisa dibuka lagi. Kunci diturunkan dari PIN — tidak ada recovery.",
                 )
             }
 
@@ -278,7 +340,7 @@ fun SettingsScreen(
                     label = "Recycle bin auto-clean",
                     trailing = {
                         SegmentedControl(
-                            options = listOf("Off", "30h", "60h"),
+                            options = listOf("Off", "30 hari", "60 hari"),
                             selectedIndex = when (trashRetention) { 0 -> 0; 30 -> 1; 60 -> 2; else -> if (trashRetention < 30) 0 else 1 },
                             onSelect = { idx -> scope.launch { s.setTrashRetentionDays(listOf(0, 30, 60)[idx]) } },
                         )
@@ -363,7 +425,7 @@ fun SettingsScreen(
             SecLabel("Tentang")
             SettingsCard {
                 Column(Modifier.padding(15.dp)) {
-                    Text("Kalku v1.0.0", style = MaterialTheme.typography.titleSmall)
+                    Text("Kalku v${com.zaaaam.kalku.BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleSmall)
                     Text(
                         "Calculator outside. Vault inside. Everything local.",
                         style = MaterialTheme.typography.bodySmall,
@@ -385,6 +447,32 @@ fun SettingsScreen(
             confirmText = "Rebuild",
             onDismiss = { showReindexConfirm = false },
             onConfirm = { showReindexConfirm = false; vm.rebuildIndex() },
+        )
+    }
+    if (showDecryptAllConfirm) {
+        ConfirmDialog(
+            title = "Nonaktifkan enkripsi?",
+            message = "Semua file akan didekripsi kembali ke plaintext dan bisa dibaca file manager. Proses bisa lama. Lanjut?",
+            confirmText = "Dekripsi semua",
+            destructive = true,
+            onDismiss = { showDecryptAllConfirm = false },
+            onConfirm = {
+                showDecryptAllConfirm = false
+                vm.toggleEncryption(false)
+            },
+        )
+    }
+    if (showEnablePinPrompt) {
+        com.zaaaam.kalku.ui.TextEntryDialog(
+            title = "Aktifkan Secure Vault",
+            label = "PIN vault saat ini",
+            initial = "",
+            confirmText = "Lanjut",
+            onDismiss = { showEnablePinPrompt = false },
+            onConfirm = { pin ->
+                showEnablePinPrompt = false
+                vm.toggleEncryption(true, pin)
+            },
         )
     }
 }
@@ -489,11 +577,12 @@ private fun SegmentedControl(
 }
 
 @Composable
-private fun KalkuSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun KalkuSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, enabled: Boolean = true) {
     // .toggle 42x24 radius12 or .switch 48x28 radius999 — HTML on bg copper/teal/ember, off bg surfaceVariant
     Switch(
         checked = checked,
         onCheckedChange = onCheckedChange,
+        enabled = enabled,
         colors = SwitchDefaults.colors(
             checkedTrackColor = MaterialTheme.colorScheme.primary,
             checkedThumbColor = Color.White,
@@ -609,8 +698,14 @@ private fun ChangePinDialog(lock: LockController, onDismiss: () -> Unit, onSucce
                         newPin.length < 4 -> error = "Minimal 4 digit"
                         newPin != confirm -> error = "Konfirmasi tidak sama"
                         else -> {
-                            lock.setPin(newPin)
-                            onSuccess()
+                            try {
+                                lock.setPin(newPin, current)
+                                onSuccess()
+                            } catch (e: Exception) {
+                                // Key re-wrap failures abort before the hash
+                                // changes — surface them instead of pretending.
+                                error = e.message ?: "Gagal mengganti PIN"
+                            }
                         }
                     }
                 }

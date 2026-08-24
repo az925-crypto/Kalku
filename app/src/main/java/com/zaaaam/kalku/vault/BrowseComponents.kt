@@ -471,11 +471,13 @@ private fun TagsField(initial: String, onChange: (String) -> Unit) {
 
 @Composable
 fun SnackHost(vm: VaultViewModel) {
-    val toast by vm.toast.collectAsState()
-    val state = androidx.compose.material3.SnackbarHostState()
-    androidx.compose.runtime.LaunchedEffect(toast) {
-        toast?.let {
-            state.showSnackbar(it)
+    val event by vm.toast.collectAsState()
+    // remember the state so recompositions don't cancel an in-flight snackbar
+    val state = androidx.compose.runtime.remember { androidx.compose.material3.SnackbarHostState() }
+    // Key on the event id: two identical messages back-to-back must both show.
+    androidx.compose.runtime.LaunchedEffect(event?.id) {
+        event?.let {
+            state.showSnackbar(it.msg)
             vm.dismissToast()
         }
     }

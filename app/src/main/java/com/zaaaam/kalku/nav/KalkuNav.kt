@@ -92,13 +92,30 @@ fun KalkuNav(mainVm: MainViewModel) {
 
     NavHost(navController = nav, startDestination = Routes.CALC) {
         composable(Routes.CALC) {
+            val navScope = androidx.compose.runtime.rememberCoroutineScope()
             CalculatorScreen(
                 vm = calcVm,
                 hapticsEnabled = true,
-                onUnlocked = { setupNeeded ->
-                    mainVm.lock.unlock()
-                    nav.navigate(Routes.VAULT)
-                    if (setupNeeded) PinSetupPending.value = true
+                onUnlocked = { signal ->
+                    // tryUnlock verifies + loads the Secure Vault DEK before we
+                    // navigate, so vault screens never see a keyless session.
+                    navScope.launch {
+                        when (signal) {
+                            is com.zaaaam.kalku.calc.UnlockSignal.Enter -> {
+                                val result = mainVm.lock.tryUnlock(signal.pin)
+                                // Wrong PIN: no navigation — the digits already
+                                // evaluated as camouflage in the calculator.
+                                if (result is com.zaaaam.kalku.security.LockController.UnlockResult.Ok) {
+                                    nav.navigate(Routes.VAULT)
+                                }
+                            }
+                            com.zaaaam.kalku.calc.UnlockSignal.Setup -> {
+                                mainVm.lock.unlock()
+                                PinSetupPending.value = true
+                                nav.navigate(Routes.VAULT)
+                            }
+                        }
+                    }
                 },
             )
         }
@@ -131,7 +148,9 @@ fun KalkuNav(mainVm: MainViewModel) {
         }
 
         composable(Routes.BROWSER) { backStack ->
-            val folder = backStack.arguments?.getString("folder").orEmpty().let(Uri::decode)
+            // navigation-compose 2.8 decodes route arguments itself; decoding
+            // again mangles names containing valid escape text (e.g. "%20").
+            val folder = backStack.arguments?.getString("folder").orEmpty()
             Guarded(mainVm.lock, nav) {
                 BrowserScreen(
                     vm = vaultVm,
@@ -163,9 +182,7 @@ fun KalkuNav(mainVm: MainViewModel) {
                 GalleryScreen(
                     vm = vaultVm,
                     onBack = { nav.popBackStack() },
-                    onOpenImage = { index ->
-                        vaultVm.images.value.getOrNull(index)?.let { nav.navigate(Routes.image(it.id)) }
-                    },
+                    onOpenImage = { id -> nav.navigate(Routes.image(id)) },
                 )
             }
         }
@@ -201,8 +218,8 @@ fun KalkuNav(mainVm: MainViewModel) {
             }
         }
         composable(Routes.EDITOR) { backStack ->
-            val path = Uri.decode(backStack.arguments?.getString("path").orEmpty())
-            val parent = Uri.decode(backStack.arguments?.getString("parent") ?: "")
+            val path = backStack.arguments?.getString("path").orEmpty()
+            val parent = backStack.arguments?.getString("parent") ?: ""
             Guarded(mainVm.lock, nav) {
                 TextEditorScreen(vm = vaultVm, relPath = path, parent = parent, onBack = { nav.popBackStack() })
             }
@@ -224,25 +241,55 @@ private fun Guarded(lock: LockController, nav: NavHostController, content: @Comp
     if (unlocked) content()
 }
 
+/** Extensions that are safe to open (and re-save) as UTF-8 text. */
+private val TEXT_EXTENSIONS = setOf(
+    "txt", "md", "log", "json", "xml", "csv", "tsv", "html", "htm", "css",
+    "js", "mjs", "cjs", "ts", "jsx", "tsx", "kt", "kts", "java", "py", "rb",
+    "go", "rs", "c", "h", "cpp", "hpp", "cs", "php", "sh", "bash", "zsh",
+    "sql", "yml", "yaml", "toml", "ini", "cfg", "conf", "properties", "env",
+    "gradle", "bat", "ps1", "gitignore", "dockerfile", "makefile", "plist",
+    "svg", "srt", "vtt", "lrc",
+)
+
+/**
+ * Editor loads whole files into memory as text — anything larger risks OOM
+ * on small devices.
+ */
+private const val MAX_EDIT_BYTES = 4L * 1000 * 1000
+
 private fun openEntry(nav: NavHostController, vm: VaultViewModel, entry: FileEntity) {
     if (entry.isFolder) {
         nav.navigate(Routes.browser(entry.relPath))
         return
     }
     val ext = CategoryDetector.extensionOf(entry.name).lowercase()
+    fun openEditor() {
+        if (entry.size <= MAX_EDIT_BYTES) {
+            nav.navigate(Routes.editor(entry.relPath, entry.parent))
+        } else {
+            vm.showToast("File terlalu besar untuk dieditor — gunakan Export/Share")
+        }
+    }
     when (entry.category) {
         "IMAGE" -> nav.navigate(Routes.image(entry.id))
         "VIDEO" -> nav.navigate(Routes.video(entry.id))
         "AUDIO" -> nav.navigate(Routes.audio(entry.id))
-        "DOCUMENT" -> if (ext == "pdf") nav.navigate(Routes.pdf(entry.id))
-                      else nav.navigate(Routes.editor(entry.relPath, entry.parent))
-        "CODE" -> nav.navigate(Routes.editor(entry.relPath, entry.parent))
+        // Only real text formats may enter the editor: routing binary
+        // documents (.docx/.xlsx/…) through a UTF-8 editor used to let one
+        // careless Save permanently corrupt the original file.
+        "DOCUMENT" -> when {
+            ext == "pdf" -> nav.navigate(Routes.pdf(entry.id))
+            ext in TEXT_EXTENSIONS -> openEditor()
+            else -> vm.showToast("Format dokumen ini belum bisa dibuka — gunakan Export/Share")
+        }
+        "CODE" -> if (ext in TEXT_EXTENSIONS || ext.isEmpty()) openEditor()
+                  else vm.showToast("Format kode ini belum bisa dibuka")
         "ARCHIVE" -> if (ext == "zip") nav.navigate(Routes.archive(entry.id)) else {
-            vm.toast.value = "Format archive ini belum bisa dibuka — gunakan Export/Share"
+            vm.showToast("Format archive ini belum bisa dibuka — gunakan Export/Share")
         }
         else -> {
-            if (entry.size <= 1_000_000) nav.navigate(Routes.editor(entry.relPath, entry.parent))
-            else vm.toast.value = "Preview tidak tersedia untuk file ini"
+            if (entry.size <= 1_000_000) openEditor()
+            else vm.showToast("Preview tidak tersedia untuk file ini")
         }
     }
 }
@@ -275,8 +322,12 @@ private fun PinSetupDialog(lock: LockController, onDone: () -> Unit) {
                     pin.length < 4 -> error = "Minimal 4 digit"
                     pin != confirm -> error = "Konfirmasi tidak sama"
                     else -> scope.launch {
-                        lock.setPin(pin)
-                        onDone()
+                        try {
+                            lock.setPin(pin)
+                            onDone()
+                        } catch (e: Exception) {
+                            error = e.message ?: "Gagal menyimpan PIN"
+                        }
                     }
                 }
             }) { Text("Save") }

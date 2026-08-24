@@ -25,13 +25,13 @@ class SettingsRepo(private val context: Context) {
         val precision = intPreferencesKey("precision")
         val historyLimit = intPreferencesKey("history_limit")
         val pinHash = stringPreferencesKey("pin_hash")
-        val biometricEnabled = booleanPreferencesKey("biometric_enabled")
         val autoLockMinutes = intPreferencesKey("auto_lock_minutes")
         val editorFontSize = intPreferencesKey("editor_font_size")
         val editorWordWrap = booleanPreferencesKey("editor_word_wrap")
         val editorLineNumbers = booleanPreferencesKey("editor_line_numbers")
         val editorTabSize = intPreferencesKey("editor_tab_size")
         val trashRetentionDays = intPreferencesKey("trash_retention_days")
+        val encryptionEnabled = booleanPreferencesKey("encryption_enabled")
         val themePack = stringPreferencesKey("theme_pack")
         val vaultIntroShown = booleanPreferencesKey("vault_intro_shown")
     }
@@ -45,13 +45,13 @@ class SettingsRepo(private val context: Context) {
     val precision: Flow<Int> = context.dataStore.data.map { it[K.precision] ?: 10 }
     val historyLimit: Flow<Int> = context.dataStore.data.map { it[K.historyLimit] ?: 100 }
     val pinHash: Flow<String?> = context.dataStore.data.map { it[K.pinHash] }
-    val biometricEnabled: Flow<Boolean> = context.dataStore.data.map { it[K.biometricEnabled] ?: false }
     val autoLockMinutes: Flow<Int> = context.dataStore.data.map { it[K.autoLockMinutes] ?: 5 }
     val editorFontSize: Flow<Int> = context.dataStore.data.map { it[K.editorFontSize] ?: 14 }
     val editorWordWrap: Flow<Boolean> = context.dataStore.data.map { it[K.editorWordWrap] ?: true }
     val editorLineNumbers: Flow<Boolean> = context.dataStore.data.map { it[K.editorLineNumbers] ?: true }
     val editorTabSize: Flow<Int> = context.dataStore.data.map { it[K.editorTabSize] ?: 4 }
     val trashRetentionDays: Flow<Int> = context.dataStore.data.map { it[K.trashRetentionDays] ?: 30 }
+    val encryptionEnabled: Flow<Boolean> = context.dataStore.data.map { it[K.encryptionEnabled] ?: false }
     val themePack: Flow<String> = context.dataStore.data.map { it[K.themePack] ?: "PRECISION" }
     val vaultIntroShown: Flow<Boolean> = context.dataStore.data.map { it[K.vaultIntroShown] ?: false }
 
@@ -66,13 +66,14 @@ class SettingsRepo(private val context: Context) {
     suspend fun setPinHash(hash: String?) = context.dataStore.edit { p ->
         if (hash == null) p.remove(K.pinHash) else p[K.pinHash] = hash
     }
-    suspend fun setBiometricEnabled(v: Boolean) = context.dataStore.edit { it[K.biometricEnabled] = v }
     suspend fun setAutoLockMinutes(v: Int) = context.dataStore.edit { it[K.autoLockMinutes] = v.coerceIn(0, 240) }
     suspend fun setEditorFontSize(v: Int) = context.dataStore.edit { it[K.editorFontSize] = v.coerceIn(10, 32) }
     suspend fun setEditorWordWrap(v: Boolean) = context.dataStore.edit { it[K.editorWordWrap] = v }
     suspend fun setEditorLineNumbers(v: Boolean) = context.dataStore.edit { it[K.editorLineNumbers] = v }
     suspend fun setEditorTabSize(v: Int) = context.dataStore.edit { it[K.editorTabSize] = v.coerceIn(2, 8) }
     suspend fun setTrashRetentionDays(v: Int) = context.dataStore.edit { it[K.trashRetentionDays] = v.coerceIn(0, 365) }
+    suspend fun setEncryptionEnabled(v: Boolean) = context.dataStore.edit { it[K.encryptionEnabled] = v }
+    suspend fun currentEncryptionEnabled(): Boolean = encryptionEnabled.first()
     suspend fun setThemePack(v: String) = context.dataStore.edit { it[K.themePack] = v }
     suspend fun setVaultIntroShown() = context.dataStore.edit { it[K.vaultIntroShown] = true }
 }
