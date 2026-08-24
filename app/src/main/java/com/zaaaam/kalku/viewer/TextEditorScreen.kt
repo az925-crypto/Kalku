@@ -222,7 +222,7 @@ fun TextEditorScreen(
                             loadFailed -> "Gagal memuat — simpan dinonaktifkan"
                             binaryBlocked -> "File biner — simpan dinonaktifkan"
                             isEncrypted -> "Terenkripsi · AES-GCM"
-                            else -> "Plaintext · di device",
+                            else -> "Plaintext · di device"
                         },
                         style = TextStyle(
                             fontFamily = MonoNumbers,

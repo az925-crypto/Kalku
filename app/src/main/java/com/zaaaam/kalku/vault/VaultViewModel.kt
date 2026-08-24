@@ -280,7 +280,7 @@ class VaultViewModel(app: Application) : AndroidViewModel(app) {
 
     fun permanentDelete(trashId: Long) = runIo { repo.permanentDelete(trashId) }
 
-    fun emptyTrash() = runIo { repo.emptyTrash(); showToast("Trash emptied" })
+    fun emptyTrash() = runIo { repo.emptyTrash(); showToast("Trash emptied") }
 
     fun purgeExpired(days: Int) = runIo { repo.purgeExpired(days) }
 
