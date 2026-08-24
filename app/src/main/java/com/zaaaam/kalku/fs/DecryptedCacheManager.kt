@@ -65,51 +65,57 @@ class DecryptedCacheManager(
             }
         }
 
+        var result: File? = null
         val pathLock = pathLocks.computeIfAbsent(relPath) { Any() }
-        val result = synchronized(pathLock) {
+        synchronized(pathLock) {
             // Double-check: another thread may have filled it while we waited.
-            synchronized(lock) {
-                entries[relPath]?.let { cached ->
-                    if (cached.isFile) {
+            val cached = synchronized(lock) {
+                val hit = entries[relPath]
+                when {
+                    hit == null -> null
+                    hit.isFile -> {
                         entries.remove(relPath)
-                        entries[relPath] = cached
-                        return@synchronized cached
+                        entries[relPath] = hit
+                        hit
                     }
-                    entries.remove(relPath)
-                    totalBytes -= cached.length()
+                    else -> {
+                        entries.remove(relPath)
+                        totalBytes -= hit.length()
+                        null
+                    }
                 }
             }
-
-            val cipher = session.cipherOrNull() ?: return@synchronized null
-            val dst = File(cacheDir, sha1(relPath) + "." + src.extension)
-            // Unique temp per attempt: two writers sharing one ".part" name
-            // would truncate each other mid-decrypt.
-            val tmp = File(cacheDir, "${dst.name}.${UUID.randomUUID()}.part")
-            try {
-                cacheDir.mkdirs()
-                FileInputStream(src).use { input ->
-                    tmp.outputStream().use { output -> cipher.decrypt(input, output) }
-                }
-                var written: File? = null
-                synchronized(lock) {
-                    dst.delete() // replace any orphaned copy from an earlier crash
-                    if (tmp.renameTo(dst)) {
-                        totalBytes += dst.length()
-                        entries[relPath] = dst
-                        evictIfNeededLocked(protect = relPath)
-                        written = dst
-                    } else {
-                        tmp.delete()
+            if (cached != null) {
+                result = cached
+            } else {
+                val cipher = session.cipherOrNull() ?: return@synchronized
+                val dst = File(cacheDir, sha1(relPath) + "." + src.extension)
+                // Unique temp per attempt: two writers sharing one ".part" name
+                // would truncate each other mid-decrypt.
+                val tmp = File(cacheDir, "${dst.name}.${UUID.randomUUID()}.part")
+                try {
+                    cacheDir.mkdirs()
+                    FileInputStream(src).use { input ->
+                        tmp.outputStream().use { output -> cipher.decrypt(input, output) }
                     }
+                    synchronized(lock) {
+                        dst.delete() // replace any orphaned copy from an earlier crash
+                        if (tmp.renameTo(dst)) {
+                            totalBytes += dst.length()
+                            entries[relPath] = dst
+                            evictIfNeededLocked(protect = relPath)
+                            result = dst
+                        } else {
+                            tmp.delete()
+                        }
+                    }
+                } catch (_: Exception) {
+                    tmp.delete()
                 }
-                written
-            } catch (_: Exception) {
-                tmp.delete()
-                null
             }
         }
         pathLocks.remove(relPath, pathLock)
-        result
+        return result
     }
 
     /** Deletes every decrypted copy (called on lock / wipe / startup). */
