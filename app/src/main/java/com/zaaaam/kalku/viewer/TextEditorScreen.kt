@@ -58,6 +58,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import com.zaaaam.kalku.ui.theme.MonoNumbers
 import com.zaaaam.kalku.vault.VaultViewModel
 

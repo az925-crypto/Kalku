@@ -4,7 +4,7 @@ import com.zaaaam.kalku.core.crypto.ChunkedGcmCipher
 import com.zaaaam.kalku.core.crypto.VaultFileFormat
 import com.zaaaam.kalku.security.CryptoSession
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.coroutineContext
+import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

@@ -150,7 +150,7 @@ fun PdfViewerScreen(vm: VaultViewModel, id: Long, onBack: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 itemsIndexed(pages, key = { _, p -> p }) { index, page ->
-                    PdfPage(renderer, renderDispatcher, page, pageCache, renderOrder, inFlight)
+                    PdfPage(renderer, renderDispatcher, page, zoom, pageCache, renderOrder, inFlight)
                     Text(
                         "${index + 1} / $pageCount",
                         style = MaterialTheme.typography.labelSmall,
@@ -196,6 +196,7 @@ private fun PdfPage(
     renderer: PdfRenderer,
     renderDispatcher: kotlinx.coroutines.CoroutineDispatcher,
     pageIndex: Int,
+    zoom: Float,
     pageCache: androidx.compose.runtime.snapshots.SnapshotStateMap<String, Bitmap>,
     renderOrder: MutableList<String>,
     inFlight: MutableSet<String>,

@@ -18,6 +18,8 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.SequenceInputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Thrown when a vault operation fails; message is user-presentable. */
 class VaultException(message: String, cause: Throwable? = null) : Exception(message, cause)
